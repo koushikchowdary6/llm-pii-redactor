@@ -1,0 +1,2 @@
+# Runtime: Python 3.8+ standard library only.
+pytest>=8
