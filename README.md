@@ -41,7 +41,8 @@ Or use it as a library, e.g. in an LLM app's input pipeline:
 ```python
 from redactor import redact
 safe_text, findings = redact(user_input)
-# send safe_text to the model; log `findings` for auditing
+# send only safe_text to the model
+# for audit telemetry, log only finding types/counts — never Finding.value
 ```
 
 ## Tests
@@ -50,9 +51,9 @@ safe_text, findings = redact(user_input)
 PYTHONPATH=src python -m pytest tests/ -v
 ```
 
-13 tests: each detector type, the Luhn check *rejecting* an invalid card, the
-entropy detector catching a generic key but **not** flagging a plain English
-word, and that clean text passes through untouched.
+16 tests: detector coverage, Luhn validation, entropy-based secret detection,
+clean-text pass-through, complete/incomplete PEM private-key handling, and
+multiple adjacent key blocks.
 
 ## Where it fits
 
@@ -73,3 +74,20 @@ not as a sole control.
 ## Author
 
 Koushik Chowdary — [LinkedIn](https://linkedin.com/in/koushik-chowdary) · [GitHub](https://github.com/koushikchowdary6)
+
+
+## Safe audit logging
+
+`Finding.value` intentionally contains the original matched secret/PII so callers
+can inspect a detection in memory. Do **not** write that value to application logs,
+telemetry, traces, or analytics. Prefer aggregate metadata such as finding kinds
+and counts:
+
+```python
+from collections import Counter
+
+safe_text, findings = redact(user_input)
+audit_counts = Counter(f.kind for f in findings)
+```
+
+This avoids turning the redaction layer itself into a secondary data-leak path.
