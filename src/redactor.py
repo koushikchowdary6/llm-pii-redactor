@@ -31,8 +31,8 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
         # Prefer an entire PEM block over its header. Matching the label at
         # both ends prevents consuming a neighboring block of a different type.
         # The header-only fallback preserves detection of incomplete input.
-        r"-----BEGIN (?P<label>(?:RSA |EC |OPENSSH )?PRIVATE KEY)-----[ \\t]*\\r?\\n"
-        r"(?:[A-Za-z0-9+/=:\\-, ]+[ \\t]*\\r?\\n)+"
+        r"-----BEGIN (?P<label>(?:RSA |EC |OPENSSH )?PRIVATE KEY)-----[ \t]*\r?\n"
+        r"(?:[A-Za-z0-9+/=:\-, ]+[ \t]*\r?\n)+"
         r"-----END (?P=label)-----"
         r"|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"
     )),
