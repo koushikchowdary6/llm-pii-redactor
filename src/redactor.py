@@ -27,7 +27,15 @@ from dataclasses import dataclass
 _PATTERNS: list[tuple[str, re.Pattern]] = [
     ("EMAIL", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")),
     ("AWS_ACCESS_KEY", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
-    ("PRIVATE_KEY", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----")),
+    ("PRIVATE_KEY", re.compile(
+        # Prefer an entire PEM block over its header. Matching the label at
+        # both ends prevents consuming a neighboring block of a different type.
+        # The header-only fallback preserves detection of incomplete input.
+        r"-----BEGIN (?P<label>(?:RSA |EC |OPENSSH )?PRIVATE KEY)-----[ \\t]*\\r?\\n"
+        r"(?:[A-Za-z0-9+/=:\\-, ]+[ \\t]*\\r?\\n)+"
+        r"-----END (?P=label)-----"
+        r"|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"
+    )),
     ("JWT", re.compile(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b")),
     ("SSN", re.compile(r"\b\d{3}-\d{2}-\d{4}\b")),
     ("CREDIT_CARD", re.compile(r"\b(?:\d[ -]*?){13,16}\b")),
