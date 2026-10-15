@@ -37,7 +37,7 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
         r"(?:(?!-----BEGIN ).)*?"
         r"-----END (?P=label)-----"
         r"|-----BEGIN (?:RSA |EC |OPENSSH |DSA |ENCRYPTED )?PRIVATE KEY-----"
-        r"(?:(?!-----BEGIN ).)*?(?=-----BEGIN |\\Z)",
+        r"(?:(?!-----BEGIN ).)*?(?=-----BEGIN |\Z)",
         re.DOTALL,
     )),
     ("JWT", re.compile(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b")),
