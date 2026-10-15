@@ -69,3 +69,47 @@ def test_entropy_monotonic():
 def test_redaction_preserves_surrounding_text():
     red, _ = redact("start jane@x.com end")
     assert red.startswith("start ") and red.endswith(" end")
+
+
+def test_complete_private_key_block_is_fully_redacted():
+    key = (
+        "-----BEGIN PRIVATE KEY-----\n"
+        "abc123DEF456+/=\n"
+        "\n"
+        "xyz789GHI012+/=\n"
+        "-----END PRIVATE KEY-----"
+    )
+    red, findings = redact(f"before {key} after")
+    assert key not in red
+    assert "[REDACTED:PRIVATE_KEY]" in red
+    assert any(f.kind == "PRIVATE_KEY" for f in findings)
+
+
+def test_incomplete_private_key_fails_closed_to_end_of_input():
+    text = (
+        "prefix -----BEGIN RSA PRIVATE KEY-----\n"
+        "abc123DEF456+/=\n"
+        "unterminated secret material"
+    )
+    red, findings = redact(text)
+    assert "abc123DEF456" not in red
+    assert "unterminated secret material" not in red
+    assert red == "prefix [REDACTED:PRIVATE_KEY]"
+    assert any(f.kind == "PRIVATE_KEY" for f in findings)
+
+
+def test_adjacent_private_key_blocks_are_redacted_independently():
+    first = (
+        "-----BEGIN PRIVATE KEY-----\n"
+        "abc123DEF456+/=\n"
+        "-----END PRIVATE KEY-----"
+    )
+    second = (
+        "-----BEGIN EC PRIVATE KEY-----\n"
+        "xyz789GHI012+/=\n"
+        "-----END EC PRIVATE KEY-----"
+    )
+    red, findings = redact(f"{first}\nseparator\n{second}")
+    assert first not in red and second not in red
+    assert red.count("[REDACTED:PRIVATE_KEY]") == 2
+    assert sum(f.kind == "PRIVATE_KEY" for f in findings) == 2
