@@ -28,13 +28,17 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     ("EMAIL", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")),
     ("AWS_ACCESS_KEY", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
     ("PRIVATE_KEY", re.compile(
-        # Prefer an entire PEM block over its header. Matching the label at
-        # both ends prevents consuming a neighboring block of a different type.
-        # The header-only fallback preserves detection of incomplete input.
-        r"-----BEGIN (?P<label>(?:RSA |EC |OPENSSH )?PRIVATE KEY)-----[ \t]*\r?\n"
-        r"(?:[A-Za-z0-9+/=:\-, ]+[ \t]*\r?\n)+"
+        # Match the complete block, including blank lines and nonstandard body
+        # formatting. Do not cross into another BEGIN block while seeking END.
+        # If the matching END is missing or malformed, fail closed: redact
+        # from the private-key header to the next BEGIN marker or end of input.
+        # This can intentionally over-redact trailing text after a broken key.
+        r"-----BEGIN (?P<label>(?:RSA |EC |OPENSSH |DSA |ENCRYPTED )?PRIVATE KEY)-----"
+        r"(?:(?!-----BEGIN ).)*?"
         r"-----END (?P=label)-----"
-        r"|-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"
+        r"|-----BEGIN (?:RSA |EC |OPENSSH |DSA |ENCRYPTED )?PRIVATE KEY-----"
+        r"(?:(?!-----BEGIN ).)*?(?=-----BEGIN |\\Z)",
+        re.DOTALL,
     )),
     ("JWT", re.compile(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b")),
     ("SSN", re.compile(r"\b\d{3}-\d{2}-\d{4}\b")),
