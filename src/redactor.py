@@ -122,8 +122,15 @@ def detect(text: str) -> list[Finding]:
     return sorted(findings, key=lambda f: f.start)
 
 
-def redact(text: str, mask: str = "[REDACTED:{kind}]") -> tuple[str, list[Finding]]:
-    """Return (redacted_text, findings). Replaces each finding with a labeled mask."""
+def redact(
+    text: str, mask: str = "[REDACTED:{kind}]", *, include_values: bool = False
+) -> tuple[str, list[Finding]]:
+    """Redact text and return metadata without raw secrets by default.
+
+    detect() exposes matching values for trusted local analysis, but callers
+    often log the findings returned by redact(). Set include_values=True
+    only when raw values are explicitly needed. Original offsets are retained.
+    """
     findings = detect(text)
     out, last = [], 0
     for f in findings:
@@ -131,7 +138,11 @@ def redact(text: str, mask: str = "[REDACTED:{kind}]") -> tuple[str, list[Findin
         out.append(mask.format(kind=f.kind))
         last = f.end
     out.append(text[last:])
-    return "".join(out), findings
+    public_findings = (
+        findings if include_values
+        else [Finding(f.kind, "[REDACTED]", f.start, f.end) for f in findings]
+    )
+    return "".join(out), public_findings
 
 
 def main() -> int:
