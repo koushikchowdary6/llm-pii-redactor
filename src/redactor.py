@@ -27,6 +27,12 @@ from dataclasses import dataclass
 _PATTERNS: list[tuple[str, re.Pattern]] = [
     ("EMAIL", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")),
     ("AWS_ACCESS_KEY", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
+    # GitHub classic PAT/OAuth/app tokens and fine-grained PATs. Recognize
+    # provider-specific prefixes even when a synthetic or low-entropy test
+    # token would not pass the generic entropy heuristic.
+    ("GITHUB_TOKEN", re.compile(
+        r"\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{20,})\b"
+    )),
     ("PRIVATE_KEY", re.compile(
         # Match the complete block, including blank lines and nonstandard body
         # formatting. Do not cross into another BEGIN block while seeking END.
@@ -49,7 +55,7 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
 
 # Order matters: try the most specific patterns first so a JWT isn't partly
 # eaten by a looser rule. CREDIT_CARD/PHONE are validated further below.
-_ORDER = ["PRIVATE_KEY", "JWT", "AWS_ACCESS_KEY", "EMAIL", "SSN",
+_ORDER = ["PRIVATE_KEY", "JWT", "AWS_ACCESS_KEY", "GITHUB_TOKEN", "EMAIL", "SSN",
           "CREDIT_CARD", "PHONE", "IPV4"]
 _PATTERN_MAP = dict(_PATTERNS)
 

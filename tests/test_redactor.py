@@ -113,3 +113,25 @@ def test_adjacent_private_key_blocks_are_redacted_independently():
     assert first not in red and second not in red
     assert red.count("[REDACTED:PRIVATE_KEY]") == 2
     assert sum(f.kind == "PRIVATE_KEY" for f in findings) == 2
+
+
+def test_classic_github_token_redacted_without_entropy_requirement():
+    # Synthetic low-entropy token: prefix/length, not randomness, drives match.
+    token = "ghp_" + "A" * 36
+    red, findings = redact(f"token={token}!")
+    assert token not in red
+    assert "[REDACTED:GITHUB_TOKEN]" in red
+    assert any(f.kind == "GITHUB_TOKEN" for f in findings)
+    assert all(f.value != token for f in findings)
+
+
+def test_fine_grained_github_token_redacted():
+    token = "github_pat_" + "A" * 25 + "_" + "B" * 25
+    red, findings = redact(f"Authorization: Bearer {token}")
+    assert token not in red
+    assert len(findings) == 1
+    assert findings[0].kind == "GITHUB_TOKEN"
+
+
+def test_short_github_like_identifier_not_flagged():
+    assert detect("issue ghp_short github_pat_demo") == []
