@@ -18,6 +18,7 @@ Pure standard library. Deterministic. No network, no LLM call needed to run.
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import math
 import re
 import sys
@@ -109,9 +110,38 @@ def _find_high_entropy(text: str, min_len: int = 20, min_entropy: float = 3.5) -
     return findings
 
 
+# Candidate extraction deliberately requires validation with ipaddress: colon-
+# separated identifiers are not necessarily addresses. Bracketed URL literals
+# and scoped link-local addresses are supported.
+_IPV6_CANDIDATES = re.compile(
+    r"(?<![A-Za-z0-9_:.])"
+    r"(?:\[[0-9A-Fa-f:.]+(?:%[A-Za-z0-9_.-]+)?\]"
+    r"|[0-9A-Fa-f:.]+(?:%[A-Za-z0-9_.-]+)?)"
+    r"(?![A-Za-z0-9_:.])"
+)
+
+
+def _find_ipv6(text: str) -> list[Finding]:
+    findings = []
+    for match in _IPV6_CANDIDATES.finditer(text):
+        raw = match.group()
+        candidate = raw[1:-1] if raw.startswith("[") and raw.endswith("]") else raw
+        if ":" not in candidate:
+            continue
+        try:
+            ipaddress.IPv6Address(candidate)
+        except ValueError:
+            continue
+        findings.append(Finding("IPV6", raw, match.start(), match.end()))
+    return findings
+
+
 def detect(text: str) -> list[Finding]:
-    findings: list[Finding] = []
-    claimed: list[tuple[int, int]] = []
+    # Validate and claim complete IPv6 literals first. Otherwise the IPv4
+    # pattern consumes the dotted tail of an IPv4-mapped IPv6 address and
+    # leaks the surrounding IPv6 prefix into the redacted output.
+    findings: list[Finding] = _find_ipv6(text)
+    claimed: list[tuple[int, int]] = [(f.start, f.end) for f in findings]
 
     def overlaps(s: int, e: int) -> bool:
         return any(s < ce and cs < e for cs, ce in claimed)
