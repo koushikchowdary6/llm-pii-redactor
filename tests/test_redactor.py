@@ -48,7 +48,7 @@ def test_jwt_detected():
 
 
 def test_high_entropy_secret_detected():
-    assert "HIGH_ENTROPY_SECRET" in _kinds("apikey sk-Abc123XyZ789Def456Ghi012Jkl")
+    assert "HIGH_ENTROPY_SECRET" in _kinds("apikey tok-Abc123XyZ789Def456Ghi012Jkl")
 
 
 def test_plain_english_word_not_flagged_as_secret():
