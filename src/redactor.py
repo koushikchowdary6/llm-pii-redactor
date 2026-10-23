@@ -137,8 +137,11 @@ def _find_ipv6(text: str) -> list[Finding]:
 
 
 def detect(text: str) -> list[Finding]:
-    findings: list[Finding] = []
-    claimed: list[tuple[int, int]] = []
+    # Validate and claim complete IPv6 literals first. Otherwise the IPv4
+    # pattern consumes the dotted tail of an IPv4-mapped IPv6 address and
+    # leaks the surrounding IPv6 prefix into the redacted output.
+    findings: list[Finding] = _find_ipv6(text)
+    claimed: list[tuple[int, int]] = [(f.start, f.end) for f in findings]
 
     def overlaps(s: int, e: int) -> bool:
         return any(s < ce and cs < e for cs, ce in claimed)
@@ -152,13 +155,6 @@ def detect(text: str) -> list[Finding]:
                 continue
             findings.append(Finding(kind, val, s, e))
             claimed.append((s, e))
-
-    # IPv6 literals need semantic validation: a broad colon/hex regex alone
-    # would redact timestamps, ratios and version strings.
-    for f in _find_ipv6(text):
-        if not overlaps(f.start, f.end):
-            findings.append(f)
-            claimed.append((f.start, f.end))
 
     for f in _find_high_entropy(text):
         if not overlaps(f.start, f.end):
