@@ -13,7 +13,7 @@ Pure Python standard library — deterministic, offline, no dependencies.
 
 **Pattern detectors:** email, phone, US SSN, credit card (with a **Luhn
 checksum** so fake 16-digit numbers aren't flagged), IPv4, AWS access keys,
-JWTs, and private-key headers.
+JWTs, GitHub classic/fine-grained access tokens, and private-key blocks.
 
 **Entropy detector:** long, high-entropy tokens that *look* like secrets
 (random API keys) even when they match no known pattern — while leaving
@@ -51,7 +51,7 @@ safe_text, findings = redact(user_input)
 PYTHONPATH=src python -m pytest tests/ -v
 ```
 
-16 tests: detector coverage, Luhn validation, entropy-based secret detection,
+Tests cover detector behavior, GitHub token formats, Luhn validation, entropy-based secret detection,
 clean-text pass-through, complete/incomplete PEM private-key handling, and
 multiple adjacent key blocks.
 
