@@ -115,7 +115,7 @@ def _find_high_entropy(text: str, min_len: int = 20, min_entropy: float = 3.5) -
 # and scoped link-local addresses are supported.
 _IPV6_CANDIDATES = re.compile(
     r"(?<![A-Za-z0-9_:.])"
-    r"(?:\\[[0-9A-Fa-f:.]+(?:%[A-Za-z0-9_.-]+)?\\]"
+    r"(?:\[[0-9A-Fa-f:.]+(?:%[A-Za-z0-9_.-]+)?\]"
     r"|[0-9A-Fa-f:.]+(?:%[A-Za-z0-9_.-]+)?)"
     r"(?![A-Za-z0-9_:.])"
 )
