@@ -13,7 +13,7 @@ Pure Python standard library — deterministic, offline, no dependencies.
 
 **Pattern detectors:** email, phone, US SSN, credit card (with a **Luhn
 checksum** so fake 16-digit numbers aren't flagged), IPv4, AWS access keys,
-JWTs, GitHub classic/fine-grained access tokens, and private-key blocks.
+JWTs, GitHub classic/fine-grained access tokens, OpenAI (`sk-`, `sk-proj-`, `sk-svcacct-`) and Anthropic (`sk-ant-`) API key prefixes, and private-key blocks.
 
 **Entropy detector:** long, high-entropy tokens that *look* like secrets
 (random API keys) even when they match no known pattern — while leaving
@@ -51,7 +51,7 @@ safe_text, findings = redact(user_input)
 PYTHONPATH=src python -m pytest tests/ -v
 ```
 
-Tests cover detector behavior, GitHub token formats, Luhn validation, entropy-based secret detection,
+Tests cover detector behavior, GitHub/OpenAI/Anthropic token formats, Luhn validation, entropy-based secret detection,
 clean-text pass-through, complete/incomplete PEM private-key handling, and
 multiple adjacent key blocks.
 
@@ -67,7 +67,7 @@ application needs.
 
 Redaction is a strong safety net, not a guarantee. Regex + entropy detection
 catches structured and obviously-random secrets, but can miss unusually
-formatted data or context-dependent PII (a name in a sentence, an internal
+formatted data, short/unknown provider tokens, or context-dependent PII (a name in a sentence, an internal
 project codename). Use it as one layer of defense-in-depth, tuned to your data,
 not as a sole control.
 
