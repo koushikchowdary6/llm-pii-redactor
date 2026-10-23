@@ -8,7 +8,8 @@ and that data then leaves your trust boundary. This strips it first.
 
 Two detector families:
   * Pattern detectors -- regexes for well-structured PII/secrets (email,
-    phone, credit card w/ Luhn check, SSN, IPv4, AWS/OpenAI/Anthropic\n    keys, GitHub tokens, JWTs, private keys).
+    phone, credit card w/ Luhn check, SSN, IPv4, AWS/OpenAI/Anthropic
+    keys, GitHub tokens, JWTs, private keys).
   * Entropy detector -- flags high-entropy tokens that look like generic
     secrets (random API keys) even when they match no known pattern.
 
@@ -33,7 +34,11 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     ("GITHUB_TOKEN", re.compile(
         r"\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{20,})\b"
     )),
-    # Prefix-aware provider tokens must be caught even when a sample token\n    # has low entropy (for example, a test fixture with repeated characters).\n    ("ANTHROPIC_API_KEY", re.compile(r"\\bsk-ant-[A-Za-z0-9_-]{20,}\\b")),\n    ("OPENAI_API_KEY", re.compile(r"\\bsk-(?!ant-)(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}\\b")),\n    ("PRIVATE_KEY", re.compile(
+    # Prefix-aware provider tokens are detected even when a synthetic token
+    # has low entropy (e.g. repeated characters in a test fixture).
+    ("ANTHROPIC_API_KEY", re.compile(r"\bsk-ant-[A-Za-z0-9_-]{20,}\b")),
+    ("OPENAI_API_KEY", re.compile(r"\bsk-(?!ant-)(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}\b")),
+    ("PRIVATE_KEY", re.compile(
         # Match the complete block, including blank lines and nonstandard body
         # formatting. Do not cross into another BEGIN block while seeking END.
         # If the matching END is missing or malformed, fail closed: redact
