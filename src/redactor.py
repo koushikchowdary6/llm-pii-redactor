@@ -8,7 +8,8 @@ and that data then leaves your trust boundary. This strips it first.
 
 Two detector families:
   * Pattern detectors -- regexes for well-structured PII/secrets (email,
-    phone, credit card w/ Luhn check, SSN, IPv4, AWS keys, JWTs, private keys).
+    phone, credit card w/ Luhn check, SSN, IPv4, AWS/OpenAI/Anthropic
+    keys, GitHub tokens, JWTs, private keys).
   * Entropy detector -- flags high-entropy tokens that look like generic
     secrets (random API keys) even when they match no known pattern.
 
@@ -33,6 +34,10 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     ("GITHUB_TOKEN", re.compile(
         r"\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{20,})\b"
     )),
+    # Prefix-aware provider tokens are detected even when a synthetic token
+    # has low entropy (e.g. repeated characters in a test fixture).
+    ("ANTHROPIC_API_KEY", re.compile(r"\bsk-ant-[A-Za-z0-9_-]{20,}\b")),
+    ("OPENAI_API_KEY", re.compile(r"\bsk-(?!ant-)(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}\b")),
     ("PRIVATE_KEY", re.compile(
         # Match the complete block, including blank lines and nonstandard body
         # formatting. Do not cross into another BEGIN block while seeking END.
@@ -55,7 +60,8 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
 
 # Order matters: try the most specific patterns first so a JWT isn't partly
 # eaten by a looser rule. CREDIT_CARD/PHONE are validated further below.
-_ORDER = ["PRIVATE_KEY", "JWT", "AWS_ACCESS_KEY", "GITHUB_TOKEN", "EMAIL", "SSN",
+_ORDER = ["PRIVATE_KEY", "JWT", "AWS_ACCESS_KEY", "GITHUB_TOKEN", "ANTHROPIC_API_KEY",
+          "OPENAI_API_KEY", "EMAIL", "SSN",
           "CREDIT_CARD", "PHONE", "IPV4"]
 _PATTERN_MAP = dict(_PATTERNS)
 
