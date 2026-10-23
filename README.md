@@ -12,7 +12,7 @@ Pure Python standard library — deterministic, offline, no dependencies.
 ## What it catches
 
 **Pattern detectors:** email, phone, US SSN, credit card (with a **Luhn
-checksum** so fake 16-digit numbers aren't flagged), IPv4, AWS access keys,
+checksum** so fake 16-digit numbers aren't flagged), IPv4 and validated IPv6 literals (including bracketed and scoped forms), AWS access keys,
 JWTs, GitHub classic/fine-grained access tokens, OpenAI (`sk-`, `sk-proj-`, `sk-svcacct-`) and Anthropic (`sk-ant-`) API key prefixes, and private-key blocks.
 
 **Entropy detector:** long, high-entropy tokens that *look* like secrets
