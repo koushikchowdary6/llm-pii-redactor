@@ -135,3 +135,30 @@ def test_fine_grained_github_token_redacted():
 
 def test_short_github_like_identifier_not_flagged():
     assert detect("issue ghp_short github_pat_demo") == []
+
+
+def test_openai_legacy_key_redacted_without_entropy_requirement():
+    token = "sk-" + "A" * 30
+    red, findings = redact(f"Authorization: Bearer {token}")
+    assert token not in red
+    assert red == "Authorization: Bearer [REDACTED:OPENAI_API_KEY]"
+    assert [f.kind for f in findings] == ["OPENAI_API_KEY"]
+    assert all(f.value != token for f in findings)
+
+
+def test_openai_project_key_redacted_without_entropy_requirement():
+    token = "sk-proj-" + "A" * 30
+    red, findings = redact(f"key={token}")
+    assert token not in red
+    assert [f.kind for f in findings] == ["OPENAI_API_KEY"]
+
+
+def test_anthropic_key_redacted_without_entropy_requirement():
+    token = "sk-ant-api03-" + "A" * 30
+    red, findings = redact(f"key={token}")
+    assert token not in red
+    assert [f.kind for f in findings] == ["ANTHROPIC_API_KEY"]
+
+
+def test_short_provider_key_like_identifiers_not_redacted():
+    assert detect("sk-demo sk-proj-demo sk-ant-api03-short") == []
