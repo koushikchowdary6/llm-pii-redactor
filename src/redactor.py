@@ -36,16 +36,16 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
         r"(?:Bearer|Basic|Token)[ \t]+[A-Za-z0-9._~+/\-]+=*"
         r"(?![A-Za-z0-9._~+/\-])"
     )),
-    # Signed webhook URLs and API requests often put low-entropy secrets in
-    # query parameters. Match only the value, preserving the parameter name
-    # and URL structure for safe troubleshooting after redaction.
     # Opaque credentials in common HTTP headers can be short or low entropy.
     # Redact the entire value, not just a token-looking substring. Restrict
     # matching to header lines so ordinary prose is unaffected.
     ("SENSITIVE_HEADER", re.compile(
-        r"(?im)^[ \\t]*(?:X-API-Key|API-Key|X-Auth-Token|X-Access-Token|Cookie|Set-Cookie)"
-        r"[ \\t]*:[ \\t]*(?P<value>[^\\r\\n]+)"
+        r"(?im)^[ \t]*(?:X-API-Key|API-Key|X-Auth-Token|X-Access-Token|Cookie|Set-Cookie)"
+        r"[ \t]*:[ \t]*(?P<value>[^\r\n]+)"
     )),
+    # Signed webhook URLs and API requests often put low-entropy secrets in
+    # query parameters. Match only the value, preserving the parameter name
+    # and URL structure for safe troubleshooting after redaction.
     ("URL_QUERY_SECRET", re.compile(
         r"""[?&](?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|sig|token)=(?P<secret>[^&#\s"'<>),;]+)""",
         re.IGNORECASE,
