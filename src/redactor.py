@@ -36,6 +36,13 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
         r"(?:Bearer|Basic|Token)[ \t]+[A-Za-z0-9._~+/\-]+=*"
         r"(?![A-Za-z0-9._~+/\-])"
     )),
+    # Signed webhook URLs and API requests often put low-entropy secrets in
+    # query parameters. Match only the value, preserving the parameter name
+    # and URL structure for safe troubleshooting after redaction.
+    ("URL_QUERY_SECRET", re.compile(
+        r"""[?&](?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|sig|token)=(?P<secret>[^&#\s"'<>),;]+)""",
+        re.IGNORECASE,
+    )),
     ("EMAIL", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")),
     ("AWS_ACCESS_KEY", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
     # GitHub classic PAT/OAuth/app tokens and fine-grained PATs. Recognize
@@ -71,7 +78,7 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
 # Order matters: try the most specific patterns first so a JWT isn't partly
 # eaten by a looser rule. CREDIT_CARD/PHONE are validated further below.
 _ORDER = ["PRIVATE_KEY", "JWT", "AWS_ACCESS_KEY", "GITHUB_TOKEN", "ANTHROPIC_API_KEY",
-          "OPENAI_API_KEY", "AUTHORIZATION_CREDENTIAL", "EMAIL", "SSN",
+          "OPENAI_API_KEY", "AUTHORIZATION_CREDENTIAL", "URL_QUERY_SECRET", "EMAIL", "SSN",
           "CREDIT_CARD", "PHONE", "IPV4"]
 _PATTERN_MAP = dict(_PATTERNS)
 
@@ -157,7 +164,13 @@ def detect(text: str) -> list[Finding]:
 
     for kind in _ORDER:
         for m in _PATTERN_MAP[kind].finditer(text):
-            s, e, val = m.start(), m.end(), m.group()
+            # Query-parameter detectors redact only the value, not its name.
+            # Other detectors continue to redact their entire match.
+            if kind == "URL_QUERY_SECRET":
+                s, e = m.span("secret")
+                val = m.group("secret")
+            else:
+                s, e, val = m.start(), m.end(), m.group()
             if overlaps(s, e):
                 continue
             if kind == "CREDIT_CARD" and not _luhn_ok(val):
