@@ -36,6 +36,13 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
         r"(?:Bearer|Basic|Token)[ \t]+[A-Za-z0-9._~+/\-]+=*"
         r"(?![A-Za-z0-9._~+/\-])"
     )),
+    # Opaque credentials in common HTTP headers can be short or low entropy.
+    # Redact the entire value, not just a token-looking substring. Restrict
+    # matching to header lines so ordinary prose is unaffected.
+    ("SENSITIVE_HEADER", re.compile(
+        r"(?im)^[ \t]*(?:X-API-Key|API-Key|X-Auth-Token|X-Access-Token|Cookie|Set-Cookie)"
+        r"[ \t]*:[ \t]*(?P<value>[^\r\n \t][^\r\n]*)"
+    )),
     # Signed webhook URLs and API requests often put low-entropy secrets in
     # query parameters. Match only the value, preserving the parameter name
     # and URL structure for safe troubleshooting after redaction.
@@ -78,7 +85,7 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
 # Order matters: try the most specific patterns first so a JWT isn't partly
 # eaten by a looser rule. CREDIT_CARD/PHONE are validated further below.
 _ORDER = ["PRIVATE_KEY", "JWT", "AWS_ACCESS_KEY", "GITHUB_TOKEN", "ANTHROPIC_API_KEY",
-          "OPENAI_API_KEY", "AUTHORIZATION_CREDENTIAL", "URL_QUERY_SECRET", "EMAIL", "SSN",
+          "OPENAI_API_KEY", "AUTHORIZATION_CREDENTIAL", "SENSITIVE_HEADER", "URL_QUERY_SECRET", "EMAIL", "SSN",
           "CREDIT_CARD", "PHONE", "IPV4"]
 _PATTERN_MAP = dict(_PATTERNS)
 
@@ -153,22 +160,33 @@ def _find_ipv6(text: str) -> list[Finding]:
 
 
 def detect(text: str) -> list[Finding]:
-    # Validate and claim complete IPv6 literals first. Otherwise the IPv4
-    # pattern consumes the dotted tail of an IPv4-mapped IPv6 address and
-    # leaks the surrounding IPv6 prefix into the redacted output.
-    findings: list[Finding] = _find_ipv6(text)
-    claimed: list[tuple[int, int]] = [(f.start, f.end) for f in findings]
+    # Claim complete sensitive header values before token/IP detectors.
+    # Otherwise an IPv6 literal or provider key inside a Cookie header can
+    # preempt the full-value match and leave the rest of the cookie exposed.
+    findings: list[Finding] = []
+    claimed: list[tuple[int, int]] = []
 
     def overlaps(s: int, e: int) -> bool:
         return any(s < ce and cs < e for cs, ce in claimed)
+
+    for match in _PATTERN_MAP["SENSITIVE_HEADER"].finditer(text):
+        start, end = match.span("value")
+        findings.append(Finding("SENSITIVE_HEADER", match.group("value"), start, end))
+        claimed.append((start, end))
+
+    # Validate and claim complete IPv6 literals before the IPv4 pattern.
+    for finding in _find_ipv6(text):
+        if not overlaps(finding.start, finding.end):
+            findings.append(finding)
+            claimed.append((finding.start, finding.end))
 
     for kind in _ORDER:
         for m in _PATTERN_MAP[kind].finditer(text):
             # Query-parameter detectors redact only the value, not its name.
             # Other detectors continue to redact their entire match.
-            if kind == "URL_QUERY_SECRET":
-                s, e = m.span("secret")
-                val = m.group("secret")
+            if kind in ("URL_QUERY_SECRET", "SENSITIVE_HEADER"):
+                s, e = m.span("secret" if kind == "URL_QUERY_SECRET" else "value")
+                val = m.group("secret" if kind == "URL_QUERY_SECRET" else "value")
             else:
                 s, e, val = m.start(), m.end(), m.group()
             if overlaps(s, e):
