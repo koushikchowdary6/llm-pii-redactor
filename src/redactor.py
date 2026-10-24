@@ -160,14 +160,25 @@ def _find_ipv6(text: str) -> list[Finding]:
 
 
 def detect(text: str) -> list[Finding]:
-    # Validate and claim complete IPv6 literals first. Otherwise the IPv4
-    # pattern consumes the dotted tail of an IPv4-mapped IPv6 address and
-    # leaks the surrounding IPv6 prefix into the redacted output.
-    findings: list[Finding] = _find_ipv6(text)
-    claimed: list[tuple[int, int]] = [(f.start, f.end) for f in findings]
+    # Claim complete sensitive header values before token/IP detectors.
+    # Otherwise an IPv6 literal or provider key inside a Cookie header can
+    # preempt the full-value match and leave the rest of the cookie exposed.
+    findings: list[Finding] = []
+    claimed: list[tuple[int, int]] = []
 
     def overlaps(s: int, e: int) -> bool:
         return any(s < ce and cs < e for cs, ce in claimed)
+
+    for match in _PATTERN_MAP["SENSITIVE_HEADER"].finditer(text):
+        start, end = match.span("value")
+        findings.append(Finding("SENSITIVE_HEADER", match.group("value"), start, end))
+        claimed.append((start, end))
+
+    # Validate and claim complete IPv6 literals before the IPv4 pattern.
+    for finding in _find_ipv6(text):
+        if not overlaps(finding.start, finding.end):
+            findings.append(finding)
+            claimed.append((finding.start, finding.end))
 
     for kind in _ORDER:
         for m in _PATTERN_MAP[kind].finditer(text):
