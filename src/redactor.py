@@ -32,9 +32,9 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     # value (including scheme) so short or repetitive secrets cannot leak.
     # Only match actual header lines, not prose mentioning authorization.
     ("AUTHORIZATION_CREDENTIAL", re.compile(
-        r"(?im)^[ \\t]*(?:Proxy-)?Authorization[ \\t]*:[ \\t]*"
-        r"(?:Bearer|Basic|Token)[ \\t]+[A-Za-z0-9._~+/\\-]+=*"
-        r"(?![A-Za-z0-9._~+/\\-])"
+        r"(?im)^[ \t]*(?:Proxy-)?Authorization[ \t]*:[ \t]*"
+        r"(?:Bearer|Basic|Token)[ \t]+[A-Za-z0-9._~+/\-]+=*"
+        r"(?![A-Za-z0-9._~+/\-])"
     )),
     ("EMAIL", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")),
     ("AWS_ACCESS_KEY", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
