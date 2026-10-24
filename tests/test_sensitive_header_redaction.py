@@ -46,3 +46,10 @@ def test_header_match_does_not_consume_next_line_when_value_missing():
     safe, findings = redact(text)
     assert safe == text
     assert findings == []
+
+
+def test_header_with_nested_ipv6_or_provider_key_redacts_every_credential():
+    text = "Cookie: session=aaaa; addr=2001:db8::1; key=sk-" + "A" * 24
+    safe, findings = redact(text)
+    assert safe == "Cookie: [REDACTED:SENSITIVE_HEADER]"
+    assert [finding.kind for finding in findings] == ["SENSITIVE_HEADER"]
