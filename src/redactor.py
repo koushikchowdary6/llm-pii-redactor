@@ -39,6 +39,13 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     # Signed webhook URLs and API requests often put low-entropy secrets in
     # query parameters. Match only the value, preserving the parameter name
     # and URL structure for safe troubleshooting after redaction.
+    # Opaque credentials in common HTTP headers can be short or low entropy.
+    # Redact the entire value, not just a token-looking substring. Restrict
+    # matching to header lines so ordinary prose is unaffected.
+    ("SENSITIVE_HEADER", re.compile(
+        r"(?im)^[ \\t]*(?:X-API-Key|API-Key|X-Auth-Token|X-Access-Token|Cookie|Set-Cookie)"
+        r"[ \\t]*:[ \\t]*(?P<value>[^\\r\\n]+)"
+    )),
     ("URL_QUERY_SECRET", re.compile(
         r"""[?&](?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|sig|token)=(?P<secret>[^&#\s"'<>),;]+)""",
         re.IGNORECASE,
@@ -78,7 +85,7 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
 # Order matters: try the most specific patterns first so a JWT isn't partly
 # eaten by a looser rule. CREDIT_CARD/PHONE are validated further below.
 _ORDER = ["PRIVATE_KEY", "JWT", "AWS_ACCESS_KEY", "GITHUB_TOKEN", "ANTHROPIC_API_KEY",
-          "OPENAI_API_KEY", "AUTHORIZATION_CREDENTIAL", "URL_QUERY_SECRET", "EMAIL", "SSN",
+          "OPENAI_API_KEY", "AUTHORIZATION_CREDENTIAL", "SENSITIVE_HEADER", "URL_QUERY_SECRET", "EMAIL", "SSN",
           "CREDIT_CARD", "PHONE", "IPV4"]
 _PATTERN_MAP = dict(_PATTERNS)
 
@@ -166,9 +173,9 @@ def detect(text: str) -> list[Finding]:
         for m in _PATTERN_MAP[kind].finditer(text):
             # Query-parameter detectors redact only the value, not its name.
             # Other detectors continue to redact their entire match.
-            if kind == "URL_QUERY_SECRET":
-                s, e = m.span("secret")
-                val = m.group("secret")
+            if kind in ("URL_QUERY_SECRET", "SENSITIVE_HEADER"):
+                s, e = m.span("secret" if kind == "URL_QUERY_SECRET" else "value")
+                val = m.group("secret" if kind == "URL_QUERY_SECRET" else "value")
             else:
                 s, e, val = m.start(), m.end(), m.group()
             if overlaps(s, e):
