@@ -41,7 +41,7 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     # matching to header lines so ordinary prose is unaffected.
     ("SENSITIVE_HEADER", re.compile(
         r"(?im)^[ \t]*(?:X-API-Key|API-Key|X-Auth-Token|X-Access-Token|Cookie|Set-Cookie)"
-        r"[ \t]*:[ \t]*(?P<value>[^\r\n]+)"
+        r"[ \t]*:[ \t]*(?P<value>[^\r\n \t][^\r\n]*)"
     )),
     # Signed webhook URLs and API requests often put low-entropy secrets in
     # query parameters. Match only the value, preserving the parameter name
