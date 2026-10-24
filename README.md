@@ -13,7 +13,7 @@ Pure Python standard library — deterministic, offline, no dependencies.
 
 **Pattern detectors:** email, phone, US SSN, credit card (with a **Luhn
 checksum** so fake 16-digit numbers aren't flagged), IPv4 and validated IPv6 literals (including bracketed and scoped forms), AWS access keys,
-JWTs, GitHub classic/fine-grained access tokens, OpenAI (`sk-`, `sk-proj-`, `sk-svcacct-`) and Anthropic (`sk-ant-`) API key prefixes, and private-key blocks.
+JWTs, GitHub classic/fine-grained access tokens, OpenAI (`sk-`, `sk-proj-`, `sk-svcacct-`) and Anthropic (`sk-ant-`) API key prefixes, and private-key blocks. HTTP `Authorization` and `Proxy-Authorization` headers with Bearer, Basic, or Token schemes are also redacted when they contain opaque credentials that provider-specific and entropy detectors might miss. For recognized provider tokens, the more specific finding type is preserved.
 
 **Entropy detector:** long, high-entropy tokens that *look* like secrets
 (random API keys) even when they match no known pattern — while leaving

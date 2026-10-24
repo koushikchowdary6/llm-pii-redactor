@@ -27,6 +27,15 @@ from dataclasses import dataclass
 # --- Pattern detectors ---------------------------------------------------------
 
 _PATTERNS: list[tuple[str, re.Pattern]] = [
+    # Some applications use opaque bearer/basic credentials without a provider
+    # prefix or enough entropy for generic detection. Redact the *whole* header
+    # value (including scheme) so short or repetitive secrets cannot leak.
+    # Only match actual header lines, not prose mentioning authorization.
+    ("AUTHORIZATION_CREDENTIAL", re.compile(
+        r"(?im)^[ \t]*(?:Proxy-)?Authorization[ \t]*:[ \t]*"
+        r"(?:Bearer|Basic|Token)[ \t]+[A-Za-z0-9._~+/\-]+=*"
+        r"(?![A-Za-z0-9._~+/\-])"
+    )),
     ("EMAIL", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")),
     ("AWS_ACCESS_KEY", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
     # GitHub classic PAT/OAuth/app tokens and fine-grained PATs. Recognize
@@ -62,7 +71,7 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
 # Order matters: try the most specific patterns first so a JWT isn't partly
 # eaten by a looser rule. CREDIT_CARD/PHONE are validated further below.
 _ORDER = ["PRIVATE_KEY", "JWT", "AWS_ACCESS_KEY", "GITHUB_TOKEN", "ANTHROPIC_API_KEY",
-          "OPENAI_API_KEY", "EMAIL", "SSN",
+          "OPENAI_API_KEY", "AUTHORIZATION_CREDENTIAL", "EMAIL", "SSN",
           "CREDIT_CARD", "PHONE", "IPV4"]
 _PATTERN_MAP = dict(_PATTERNS)
 
