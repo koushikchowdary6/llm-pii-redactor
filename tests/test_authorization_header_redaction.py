@@ -47,3 +47,31 @@ def test_multiple_opaque_headers_do_not_leak_values():
     assert "dXNlcjpwYXNz" not in output
     assert output.count("[REDACTED:AUTHORIZATION_CREDENTIAL]") == 2
     assert len(findings) == 2
+
+
+@pytest.mark.parametrize("header", [
+    'Authorization: Digest username="alice", realm="private", response="aaaa"',
+    "Authorization: AWS4-HMAC-SHA256 Credential=demo/20261024/us-east-1/s3/aws4_request, SignedHeaders=host, Signature=aaaa",
+    "Proxy-Authorization: Custom low-entropy credential",
+    "Authorization: Bearer opaque-token, extra=123",
+    "Authorization: Bearer first second",
+])
+def test_other_schemes_and_multifield_credentials_do_not_leak(header):
+    output, findings = redact(f"before\n{header}\nafter")
+    assert output == "before\n[REDACTED:AUTHORIZATION_CREDENTIAL]\nafter"
+    assert [f.kind for f in findings] == ["AUTHORIZATION_CREDENTIAL"]
+
+
+def test_authorization_header_does_not_consume_following_lines():
+    text = "Authorization: Digest username=alice, response=aaaa\nAccept: text/plain"
+    output, findings = redact(text)
+    assert output == "[REDACTED:AUTHORIZATION_CREDENTIAL]\nAccept: text/plain"
+    assert len(findings) == 1
+
+
+def test_provider_key_with_additional_header_parameters_is_fully_redacted():
+    token = "sk-" + "A" * 30
+    text = f"Authorization: Bearer {token}, extra=opaque"
+    output, findings = redact(text)
+    assert output == "[REDACTED:AUTHORIZATION_CREDENTIAL]"
+    assert len(findings) == 1
