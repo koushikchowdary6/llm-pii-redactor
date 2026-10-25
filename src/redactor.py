@@ -46,7 +46,7 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     # query parameters. Match only the value, preserving the parameter name
     # and URL structure for safe troubleshooting after redaction.
     ("URL_QUERY_SECRET", re.compile(
-        r"""[?&](?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|sig|token)=(?P<secret>[^&#\s"'<>),;]+)""",
+        r"""[?&](?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|x-amz-(?:signature|security-token)|password|passwd|secret|signature|sig|token)=(?P<secret>[^&#\s"'<>),;]+)""",
         re.IGNORECASE,
     )),
     ("EMAIL", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")),
