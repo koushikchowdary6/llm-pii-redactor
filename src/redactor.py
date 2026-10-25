@@ -32,8 +32,8 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     # value (including scheme) so short or repetitive secrets cannot leak.
     # Only match actual header lines, not prose mentioning authorization.
     ("AUTHORIZATION_CREDENTIAL", re.compile(
-        r"(?im)^[ \\t]*(?:Proxy-)?Authorization[ \\t]*:[ \\t]*"
-        r"(?P<value>[^\\r\\n \\t][^\\r\\n]*)"
+        r"(?im)^[ \t]*(?:Proxy-)?Authorization[ \t]*:[ \t]*"
+        r"(?P<value>[^\r\n \t][^\r\n]*)"
     )),
     # Opaque credentials in common HTTP headers can be short or low entropy.
     # Redact the entire value, not just a token-looking substring. Restrict
