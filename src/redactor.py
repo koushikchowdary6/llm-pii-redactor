@@ -46,7 +46,7 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     # query parameters. Match only the value, preserving the parameter name
     # and URL structure for safe troubleshooting after redaction.
     ("URL_QUERY_SECRET", re.compile(
-        r"""[?&](?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|sig|token)=(?P<secret>[^&#\s"'<>),;]+)""",
+        r"""[?&](?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|x-amz-(?:signature|security-token)|password|passwd|secret|signature|sig|token)=(?P<secret>[^&#\s"'<>),;]+)""",
         re.IGNORECASE,
     )),
     ("EMAIL", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")),
@@ -124,6 +124,11 @@ def _find_high_entropy(text: str, min_len: int = 20, min_entropy: float = 3.5) -
     findings = []
     for m in re.finditer(r"\b[A-Za-z0-9+/_\-]{%d,}\b" % min_len, text):
         tok = m.group()
+        # Query parameter names are metadata, not secret values. Preserve
+        # them so a separately redacted credential value stays attributable.
+        if (m.start() > 0 and text[m.start() - 1] in "?&"
+                and text[m.end():m.end() + 1] == "="):
+            continue
         # Skip tokens that are all letters or all digits -- likely words/ids.
         if tok.isalpha() or tok.isdigit():
             continue
