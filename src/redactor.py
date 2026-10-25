@@ -32,9 +32,8 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     # value (including scheme) so short or repetitive secrets cannot leak.
     # Only match actual header lines, not prose mentioning authorization.
     ("AUTHORIZATION_CREDENTIAL", re.compile(
-        r"(?im)^[ \t]*(?:Proxy-)?Authorization[ \t]*:[ \t]*"
-        r"(?:Bearer|Basic|Token)[ \t]+[A-Za-z0-9._~+/\-]+=*"
-        r"(?![A-Za-z0-9._~+/\-])"
+        r"(?im)^[ \\t]*(?:Proxy-)?Authorization[ \\t]*:[ \\t]*"
+        r"(?P<value>[^\\r\\n \\t][^\\r\\n]*)"
     )),
     # Opaque credentials in common HTTP headers can be short or low entropy.
     # Redact the entire value, not just a token-looking substring. Restrict
@@ -173,6 +172,26 @@ def detect(text: str) -> list[Finding]:
         start, end = match.span("value")
         findings.append(Finding("SENSITIVE_HEADER", match.group("value"), start, end))
         claimed.append((start, end))
+
+    # An Authorization header can carry Digest, AWS SigV4, or a custom
+    # credential scheme. Redact the complete opaque header so commas,
+    # whitespace and multiple credential fields cannot leave a tail exposed.
+    # Preserve provider-specific finding kinds for a single known token.
+    for match in _PATTERN_MAP["AUTHORIZATION_CREDENTIAL"].finditer(text):
+        value = match.group("value").strip()
+        parts = value.split()
+        if len(parts) == 1 and parts[0].lower() in {"bearer", "basic", "token"}:
+            continue  # A bare scheme is not a credential.
+        if (len(parts) == 2 and parts[0].lower() in {"bearer", "basic", "token"}
+                and any(_PATTERN_MAP[kind].fullmatch(parts[1]) for kind in (
+                    "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GITHUB_TOKEN",
+                    "AWS_ACCESS_KEY", "JWT",
+                ))):
+            continue
+        findings.append(Finding(
+            "AUTHORIZATION_CREDENTIAL", match.group(), match.start(), match.end()
+        ))
+        claimed.append(match.span())
 
     # Validate and claim complete IPv6 literals before the IPv4 pattern.
     for finding in _find_ipv6(text):
