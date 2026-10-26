@@ -17,6 +17,8 @@ JWTs, GitHub classic/fine-grained access tokens, OpenAI (`sk-`, `sk-proj-`, `sk-
 
 **URL credential redaction:** known secret-bearing query keys (such as `sig`, `X-Amz-Signature`, and `access_token`) are masked even for low-entropy values. OAuth redirect fragments starting with `#access_token=` or `#id_token=` are also covered; ordinary URL fragments and non-secret parameters remain visible. This is key-name-based matching, not full URL parsing or detection of every custom credential name.
 
+**JSON credential fields:** quoted string values under keys such as `api_key`, `access_token`, `client_secret`, `password`, `authorization`, and `session_token` are redacted even when short or low-entropy. The replacement stays inside the JSON quotes, preserving valid JSON. Escaped quotes and backslashes inside values are handled. Empty values, non-string values, and arbitrary custom field names are not covered by this rule; JSON matching is pattern-based, not a full parser.
+
 **Entropy detector:** long, high-entropy tokens that *look* like secrets
 (random API keys) even when they match no known pattern — while leaving
 ordinary long words alone.
