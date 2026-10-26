@@ -31,16 +31,19 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     # prefix or enough entropy for generic detection. Redact the *whole* header
     # value (including scheme) so short or repetitive secrets cannot leak.
     # Only match actual header lines, not prose mentioning authorization.
+    # Legacy folded continuation lines belong to the same credential and
+    # must not survive redaction as a separate line.
     ("AUTHORIZATION_CREDENTIAL", re.compile(
         r"(?im)^[ \t]*(?:Proxy-)?Authorization[ \t]*:[ \t]*"
-        r"(?P<value>[^\r\n \t][^\r\n]*)"
+        r"(?P<value>[^\r\n \t][^\r\n]*(?:\r?\n[ \t]+[^\r\n]*)*)"
     )),
     # Opaque credentials in common HTTP headers can be short or low entropy.
     # Redact the entire value, not just a token-looking substring. Restrict
-    # matching to header lines so ordinary prose is unaffected.
+    # matching to header lines so ordinary prose is unaffected. Include
+    # folded continuation lines in the value to prevent partial disclosure.
     ("SENSITIVE_HEADER", re.compile(
         r"(?im)^[ \t]*(?:X-API-Key|API-Key|X-Auth-Token|X-Access-Token|Cookie|Set-Cookie)"
-        r"[ \t]*:[ \t]*(?P<value>[^\r\n \t][^\r\n]*)"
+        r"[ \t]*:[ \t]*(?P<value>[^\r\n \t][^\r\n]*(?:\r?\n[ \t]+[^\r\n]*)*)"
     )),
     # Signed URLs and OAuth implicit/hybrid redirects can carry low-entropy
     # credentials in query strings *or fragments*. The first fragment field
