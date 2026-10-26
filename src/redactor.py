@@ -50,6 +50,17 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
         r"""[?&#](?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|x-amz-(?:signature|security-token)|password|passwd|secret|signature|sig|token)=(?P<secret>[^&#\s"'<>),;]+)""",
         re.IGNORECASE,
     )),
+    # JSON credential fields often contain short, low-entropy values that
+    # provider-token and entropy detectors miss. Match the *string contents*
+    # so replacement preserves valid JSON and leaves the key inspectable.
+    # Escaped quotes/backslashes are consumed as part of the same value.
+    ("JSON_SECRET", re.compile(
+        r'"(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|'
+        r'client[_-]?secret|password|passwd|secret|token|authorization|'
+        r'session[_-]?token|webhook[_-]?secret)"[ \t\r\n]*:[ \t\r\n]*'
+        r'"(?P<value>(?:\\.|[^"\\])+)"',
+        re.IGNORECASE,
+    )),
     ("EMAIL", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")),
     ("AWS_ACCESS_KEY", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
     # GitHub classic PAT/OAuth/app tokens and fine-grained PATs. Recognize
@@ -198,6 +209,15 @@ def detect(text: str) -> list[Finding]:
             "AUTHORIZATION_CREDENTIAL", match.group(), match.start(), match.end()
         ))
         claimed.append(match.span())
+
+    # Claim JSON credential strings before IP/provider/entropy detectors.
+    # Otherwise a nested email or token can consume only part of a value,
+    # leaving surrounding credential bytes visible in the sanitized JSON.
+    for match in _PATTERN_MAP["JSON_SECRET"].finditer(text):
+        start, end = match.span("value")
+        if not overlaps(start, end):
+            findings.append(Finding("JSON_SECRET", match.group("value"), start, end))
+            claimed.append((start, end))
 
     # Validate and claim complete IPv6 literals before the IPv4 pattern.
     for finding in _find_ipv6(text):
