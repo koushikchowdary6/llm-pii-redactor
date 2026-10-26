@@ -15,7 +15,7 @@ Pure Python standard library — deterministic, offline, no dependencies.
 checksum** so fake 16-digit numbers aren't flagged), IPv4 and validated IPv6 literals (including bracketed and scoped forms), AWS access keys,
 JWTs, GitHub classic/fine-grained access tokens, OpenAI (`sk-`, `sk-proj-`, `sk-svcacct-`) and Anthropic (`sk-ant-`) API key prefixes, and private-key blocks. HTTP `Authorization` and `Proxy-Authorization` headers are redacted as complete opaque credential lines, including Digest, AWS SigV4, custom schemes, and multi-field values that could otherwise leak a trailing secret. For a single recognized provider token under Bearer/Basic/Token, the more specific finding type is preserved. Bare scheme names without credentials are not redacted. Common credential-bearing `X-API-Key`, `API-Key`, `X-Auth-Token`, `X-Access-Token`, `Cookie`, and `Set-Cookie` header values are redacted as complete values, even when their contents are short, low-entropy, or contain multiple credentials. Non-sensitive headers are preserved.
 
-**Entropy detector:** long, high-entropy tokens that *look* like secrets
+**URL credential redaction:** known secret-bearing query keys (such as `sig`, `X-Amz-Signature`, and `access_token`) are masked even for low-entropy values. OAuth redirect fragments starting with `#access_token=` or `#id_token=` are also covered; ordinary URL fragments and non-secret parameters remain visible. This is key-name-based matching, not full URL parsing or detection of every custom credential name.\n\n**Entropy detector:** long, high-entropy tokens that *look* like secrets
 (random API keys) even when they match no known pattern — while leaving
 ordinary long words alone.
 
