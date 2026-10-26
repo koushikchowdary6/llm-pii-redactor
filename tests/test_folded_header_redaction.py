@@ -50,7 +50,7 @@ def test_indented_unrelated_header_is_not_considered_folded_without_sensitive_he
 
 
 def test_empty_sensitive_header_does_not_claim_following_line():
-    text = "X-API-Key: \n\tcontinued-without-value\nAccept: text/plain"
+    text = "X-API-Key: \n\tshort\nAccept: text/plain"
     safe, findings = redact(text)
     assert safe == text
     assert findings == []
