@@ -42,11 +42,12 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
         r"(?im)^[ \t]*(?:X-API-Key|API-Key|X-Auth-Token|X-Access-Token|Cookie|Set-Cookie)"
         r"[ \t]*:[ \t]*(?P<value>[^\r\n \t][^\r\n]*)"
     )),
-    # Signed webhook URLs and API requests often put low-entropy secrets in
-    # query parameters. Match only the value, preserving the parameter name
-    # and URL structure for safe troubleshooting after redaction.
+    # Signed URLs and OAuth implicit/hybrid redirects can carry low-entropy
+    # credentials in query strings *or fragments*. The first fragment field
+    # begins with '#', not '?' or '&'; missing it leaks access/id tokens.
+    # Match only the value so surrounding URL metadata stays inspectable.
     ("URL_QUERY_SECRET", re.compile(
-        r"""[?&](?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|x-amz-(?:signature|security-token)|password|passwd|secret|signature|sig|token)=(?P<secret>[^&#\s"'<>),;]+)""",
+        r"""[?&#](?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|x-amz-(?:signature|security-token)|password|passwd|secret|signature|sig|token)=(?P<secret>[^&#\s"'<>),;]+)""",
         re.IGNORECASE,
     )),
     ("EMAIL", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")),
