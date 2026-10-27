@@ -47,10 +47,13 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     )),
     # Signed URLs, OAuth fragments, and form-encoded request bodies can
     # carry short credentials. A form body may start with access_token=...,
-    # without a URL query delimiter. Reject partial key-name matches while
-    # preserving the assignment name for auditing. Match only the value.
+    # without a URL query delimiter. Also cover quoted or space-padded .env
+    # assignments whose low-entropy values otherwise survive unchanged.
+    # Reject partial key-name matches while preserving the assignment name.
+    # Include quote delimiters in the redacted span to avoid leaking quoted
+    # values with embedded spaces or escaped quotes.
     ("URL_QUERY_SECRET", re.compile(
-        r"""(?<![A-Za-z0-9_.-])(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|x-amz-(?:signature|security-token)|password|passwd|secret|signature|sig|token)=(?P<secret>[^&#\s"'<>),;]+)""",
+        r"""(?<![A-Za-z0-9_.-])(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|x-amz-(?:signature|security-token)|password|passwd|secret|signature|sig|token)[ \t]*=[ \t]*(?P<secret>"(?:\\.|[^"\\\r\n])+"|'(?:\\.|[^'\\\r\n])+'|[^&#\s"'<>),;]+)""",
         re.IGNORECASE,
     )),
     # JSON credential fields often contain short, low-entropy values that
