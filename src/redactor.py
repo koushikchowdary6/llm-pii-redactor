@@ -45,12 +45,12 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
         r"(?im)^[ \t]*(?:X-API-Key|API-Key|X-Auth-Token|X-Access-Token|Cookie|Set-Cookie)"
         r"[ \t]*:[ \t]*(?P<value>(?:[^\r\n \t][^\r\n]*(?:\r?\n[ \t]+[^\r\n]*)*|\r?\n[ \t]+[^\r\n \t][^\r\n]*(?:\r?\n[ \t]+[^\r\n]*)*))"
     )),
-    # Signed URLs and OAuth implicit/hybrid redirects can carry low-entropy
-    # credentials in query strings *or fragments*. The first fragment field
-    # begins with '#', not '?' or '&'; missing it leaks access/id tokens.
-    # Match only the value so surrounding URL metadata stays inspectable.
+    # Signed URLs, OAuth fragments, and form-encoded request bodies can
+    # carry short credentials. A form body may start with access_token=...,
+    # without a URL query delimiter. Reject partial key-name matches while
+    # preserving the assignment name for auditing. Match only the value.
     ("URL_QUERY_SECRET", re.compile(
-        r"""[?&#](?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|x-amz-(?:signature|security-token)|password|passwd|secret|signature|sig|token)=(?P<secret>[^&#\s"'<>),;]+)""",
+        r"""(?<![A-Za-z0-9_.-])(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|x-amz-(?:signature|security-token)|password|passwd|secret|signature|sig|token)=(?P<secret>[^&#\s"'<>),;]+)""",
         re.IGNORECASE,
     )),
     # JSON credential fields often contain short, low-entropy values that
