@@ -60,6 +60,16 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     # provider-token and entropy detectors miss. Match the *string contents*
     # so replacement preserves valid JSON and leaves the key inspectable.
     # Escaped quotes/backslashes are consumed as part of the same value.
+    # YAML-style configuration commonly uses "password: value" instead of
+    # .env "=" assignments. Short and low-entropy secrets must not escape
+    # redaction just because they lack a provider prefix. Match only a
+    # standalone credential key, preserving its indentation and key name.
+    # Keep trailing YAML comments outside the secret span; an unquoted
+    # value may contain spaces or a literal '#' without a preceding space.
+    ("CONFIG_SECRET", re.compile(
+        r"""^[ \t]*(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|password|passwd|secret|signature|token|session[_-]?token|webhook[_-]?secret)[ \t]*:[ \t]*(?P<secret>"(?:\\.|[^"\\\r\n])+"|'(?:\\.|[^'\\\r\n])+'|[^ \t\r\n#"'][^\r\n]*?)(?=[ \t]+\#.*\r?$|[ \t]*\r?$)""",
+        re.IGNORECASE | re.MULTILINE,
+    )),
     ("JSON_SECRET", re.compile(
         r'"(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|'
         r'client[_-]?secret|password|passwd|secret|token|authorization|'
@@ -102,7 +112,7 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
 # Order matters: try the most specific patterns first so a JWT isn't partly
 # eaten by a looser rule. CREDIT_CARD/PHONE are validated further below.
 _ORDER = ["PRIVATE_KEY", "JWT", "AWS_ACCESS_KEY", "GITHUB_TOKEN", "ANTHROPIC_API_KEY",
-          "OPENAI_API_KEY", "SENSITIVE_HEADER", "URL_QUERY_SECRET", "EMAIL", "SSN",
+          "OPENAI_API_KEY", "SENSITIVE_HEADER", "CONFIG_SECRET", "URL_QUERY_SECRET", "EMAIL", "SSN",
           "CREDIT_CARD", "PHONE", "IPV4"]
 _PATTERN_MAP = dict(_PATTERNS)
 
@@ -235,9 +245,10 @@ def detect(text: str) -> list[Finding]:
         for m in _PATTERN_MAP[kind].finditer(text):
             # Query-parameter detectors redact only the value, not its name.
             # Other detectors continue to redact their entire match.
-            if kind in ("URL_QUERY_SECRET", "SENSITIVE_HEADER"):
-                s, e = m.span("secret" if kind == "URL_QUERY_SECRET" else "value")
-                val = m.group("secret" if kind == "URL_QUERY_SECRET" else "value")
+            if kind in ("URL_QUERY_SECRET", "CONFIG_SECRET", "SENSITIVE_HEADER"):
+                field = "value" if kind == "SENSITIVE_HEADER" else "secret"
+                s, e = m.span(field)
+                val = m.group(field)
             else:
                 s, e, val = m.start(), m.end(), m.group()
             if overlaps(s, e):
