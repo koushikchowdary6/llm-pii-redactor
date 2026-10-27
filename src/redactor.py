@@ -67,7 +67,7 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     # Keep trailing YAML comments outside the secret span; an unquoted
     # value may contain spaces or a literal '#' without a preceding space.
     ("CONFIG_SECRET", re.compile(
-        r"""^[ \t]*(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|password|passwd|secret|signature|token|authorization|session[_-]?token|webhook[_-]?secret)[ \t]*:[ \t]*(?P<secret>"(?:\\.|[^"\\\r\n])+"|'(?:\\.|[^'\\\r\n])+'|[^ \t\r\n#"'][^\r\n]*?)(?=[ \t]+\#.*\r?$|[ \t]*\r?$)""",
+        r"""^[ \t]*(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|password|passwd|secret|signature|token|session[_-]?token|webhook[_-]?secret)[ \t]*:[ \t]*(?P<secret>"(?:\\.|[^"\\\r\n])+"|'(?:\\.|[^'\\\r\n])+'|[^ \t\r\n#"'][^\r\n]*?)(?=[ \t]+\#.*\r?$|[ \t]*\r?$)""",
         re.IGNORECASE | re.MULTILINE,
     )),
     ("JSON_SECRET", re.compile(
