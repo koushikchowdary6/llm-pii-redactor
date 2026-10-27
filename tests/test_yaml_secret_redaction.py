@@ -18,7 +18,7 @@ from redactor import redact
     ("API_KEY: alpha beta", "API_KEY: [REDACTED:CONFIG_SECRET]"),
     ("session_token: 'short secret'",
      "session_token: [REDACTED:CONFIG_SECRET]"),
-    ("password: aaaa\\r", "password: [REDACTED:CONFIG_SECRET]\\r"),
+    ("password: aaaa\r", "password: [REDACTED:CONFIG_SECRET]\r"),
 ])
 def test_yaml_credentials_redact_complete_values(line, expected):
     safe, findings = redact(line)
@@ -29,27 +29,27 @@ def test_yaml_credentials_redact_complete_values(line, expected):
 
 def test_yaml_secrets_do_not_consume_comments_or_neighboring_fields():
     text = (
-        "service: payments\\n"
-        "password: ab cd # rotation required\\n"
-        "region: us-west-2\\n"
-        "token: abc#def\\n"
+        "service: payments\n"
+        "password: ab cd # rotation required\n"
+        "region: us-west-2\n"
+        "token: abc#def\n"
     )
     safe, findings = redact(text)
     assert safe == (
-        "service: payments\\n"
-        "password: [REDACTED:CONFIG_SECRET] # rotation required\\n"
-        "region: us-west-2\\n"
-        "token: [REDACTED:CONFIG_SECRET]\\n"
+        "service: payments\n"
+        "password: [REDACTED:CONFIG_SECRET] # rotation required\n"
+        "region: us-west-2\n"
+        "token: [REDACTED:CONFIG_SECRET]\n"
     )
     assert [f.kind for f in findings] == ["CONFIG_SECRET", "CONFIG_SECRET"]
 
 
 def test_non_secret_yaml_and_empty_values_remain_unchanged():
     text = (
-        "region: us-west-2\\n"
-        "password: \\n"
-        'token: ""\\n'
-        "Please discuss password: aaaa\\n"
+        "region: us-west-2\n"
+        "password: \n"
+        'token: ""\n'
+        "Please discuss password: aaaa\n"
     )
     safe, findings = redact(text)
     assert safe == text
