@@ -53,7 +53,7 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     # Include quote delimiters in the redacted span to avoid leaking quoted
     # values with embedded spaces or escaped quotes.
     ("URL_QUERY_SECRET", re.compile(
-        r"""(?<![A-Za-z0-9_.-])(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|x-amz-(?:signature|security-token)|password|passwd|secret|signature|sig|token)[ \t]*=[ \t]*(?P<secret>"(?:\\.|[^"\\\r\n])+"|'(?:\\.|[^'\\\r\n])+'|[^&#\s"'<>),;]+)""",
+        r"""(?<![A-Za-z0-9_.-])(?:aws[_-]?(?:secret[_-]?access[_-]?key|session[_-]?token|access[_-]?key[_-]?id)|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|x-amz-(?:signature|security-token)|password|passwd|secret|signature|sig|token)[ \t]*=[ \t]*(?P<secret>"(?:\\.|[^"\\\r\n])+"|'(?:\\.|[^'\\\r\n])+'|[^&#\s"'<>),;]+)""",
         re.IGNORECASE,
     )),
     # JSON credential fields often contain short, low-entropy values that
@@ -67,12 +67,12 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     # Keep trailing YAML comments outside the secret span; an unquoted
     # value may contain spaces or a literal '#' without a preceding space.
     ("CONFIG_SECRET", re.compile(
-        r"""^[ \t]*(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|password|passwd|secret|signature|token|session[_-]?token|webhook[_-]?secret)[ \t]*:[ \t]*(?P<secret>"(?:\\.|[^"\\\r\n])+"|'(?:\\.|[^'\\\r\n])+'|[^ \t\r\n#"'][^\r\n]*?)(?=[ \t]+\#.*\r?$|[ \t]*\r?$)""",
+        r"""^[ \t]*(?:aws[_-]?(?:secret[_-]?access[_-]?key|session[_-]?token|access[_-]?key[_-]?id)|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|password|passwd|secret|signature|token|session[_-]?token|webhook[_-]?secret)[ \t]*:[ \t]*(?P<secret>"(?:\\.|[^"\\\r\n])+"|'(?:\\.|[^'\\\r\n])+'|[^ \t\r\n#"'][^\r\n]*?)(?=[ \t]+\#.*\r?$|[ \t]*\r?$)""",
         re.IGNORECASE | re.MULTILINE,
     )),
     ("JSON_SECRET", re.compile(
         r'"(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|'
-        r'client[_-]?secret|password|passwd|secret|token|authorization|'
+        r'client[_-]?secret|aws[_-]?(?:secret[_-]?access[_-]?key|session[_-]?token|access[_-]?key[_-]?id)|password|passwd|secret|token|authorization|'
         r'session[_-]?token|webhook[_-]?secret)"[ \t\r\n]*:[ \t\r\n]*'
         r'"(?P<value>(?:\\.|[^"\\])+)"',
         re.IGNORECASE,
