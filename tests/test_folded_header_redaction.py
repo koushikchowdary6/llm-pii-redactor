@@ -49,8 +49,27 @@ def test_indented_unrelated_header_is_not_considered_folded_without_sensitive_he
     assert findings == []
 
 
-def test_empty_sensitive_header_does_not_claim_following_line():
-    text = "X-API-Key: \n\tshort\nAccept: text/plain"
+@pytest.mark.parametrize("header", [
+    "Authorization", "Proxy-Authorization", "Cookie", "Set-Cookie",
+    "X-API-Key", "API-Key", "X-Auth-Token", "X-Access-Token",
+])
+@pytest.mark.parametrize("newline", ["\n", "\r\n"])
+def test_blank_first_line_does_not_leak_folded_credentials(header, newline):
+    text = f"{header}: {newline}\tshortsecret{newline}Accept: text/plain"
+    safe, findings = redact(text)
+    assert "shortsecret" not in safe
+    assert safe.endswith("Accept: text/plain")
+    assert len(findings) == 1
+    assert findings[0].value == "[REDACTED]"
+    if header in {"Authorization", "Proxy-Authorization"}:
+        assert safe == f"[REDACTED:AUTHORIZATION_CREDENTIAL]{newline}Accept: text/plain"
+    else:
+        assert safe == f"{header}: [REDACTED:SENSITIVE_HEADER]{newline}Accept: text/plain"
+
+
+@pytest.mark.parametrize("header", ["Authorization", "X-API-Key", "Cookie"])
+def test_truly_empty_header_does_not_claim_following_header_or_body(header):
+    text = f"{header}: \nAccept: text/plain\n\n  visible body"
     safe, findings = redact(text)
     assert safe == text
     assert findings == []
