@@ -28,7 +28,9 @@ def test_multiline_log_assignments_and_multiple_form_fields():
     assert "client_secret=[REDACTED:URL_QUERY_SECRET]" in safe
     assert "access_token=[REDACTED:URL_QUERY_SECRET]" in safe
     assert "aaaa" not in safe and "bbbb" not in safe
-    assert len(findings) == 2
+    # The independent entropy heuristic may also flag the MIME header;
+    # assert the two credential findings without assuming no other detections.
+    assert sum(f.kind == "URL_QUERY_SECRET" for f in findings) == 2
 
 
 def test_assignment_keys_must_not_match_inside_other_names():
