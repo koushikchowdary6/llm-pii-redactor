@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import ipaddress
+import json
 import math
 import re
 import sys
@@ -75,6 +76,18 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
         r'client[_-]?secret|aws[_-]?(?:secret[_-]?access[_-]?key|session[_-]?token|access[_-]?key[_-]?id)|password|passwd|secret|token|authorization|'
         r'session[_-]?token|webhook[_-]?secret)"[ \t\r\n]*:[ \t\r\n]*'
         r'"(?P<value>(?:\\.|[^"\\])+)"',
+        re.IGNORECASE,
+    )),
+    # JSON credentials sometimes arrive as unquoted numeric values (PINs,
+    # numeric API tokens, legacy passwords). Preserve the JSON structure by
+    # quoting the replacement in redact(); never expose the numeric value.
+    # The trailing delimiter prevents matching a prefix of malformed JSON.
+    ("JSON_NUMERIC_SECRET", re.compile(
+        r'"(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|'
+        r'client[_-]?secret|aws[_-]?(?:secret[_-]?access[_-]?key|session[_-]?token|access[_-]?key[_-]?id)|'
+        r'password|passwd|secret|token|authorization|session[_-]?token|webhook[_-]?secret)"'
+        r'[ \t\r\n]*:[ \t\r\n]*(?P<value>-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)'
+        r'(?=[ \t\r\n]*[,}\]])',
         re.IGNORECASE,
     )),
     ("EMAIL", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")),
@@ -233,11 +246,12 @@ def detect(text: str) -> list[Finding]:
     # Claim JSON credential strings before IP/provider/entropy detectors.
     # Otherwise a nested email or token can consume only part of a value,
     # leaving surrounding credential bytes visible in the sanitized JSON.
-    for match in _PATTERN_MAP["JSON_SECRET"].finditer(text):
-        start, end = match.span("value")
-        if not overlaps(start, end):
-            findings.append(Finding("JSON_SECRET", match.group("value"), start, end))
-            claimed.append((start, end))
+    for kind in ("JSON_SECRET", "JSON_NUMERIC_SECRET"):
+        for match in _PATTERN_MAP[kind].finditer(text):
+            start, end = match.span("value")
+            if not overlaps(start, end):
+                findings.append(Finding(kind, match.group("value"), start, end))
+                claimed.append((start, end))
 
     # Validate and claim complete IPv6 literals before the IPv4 pattern.
     for finding in _find_ipv6(text):
@@ -285,7 +299,12 @@ def redact(
     out, last = [], 0
     for f in findings:
         out.append(text[last:f.start])
-        out.append(mask.format(kind=f.kind))
+        replacement = mask.format(kind=f.kind)
+        # JSON numbers cannot be replaced with bare [REDACTED] text without
+        # breaking the surrounding JSON document. Quote and escape the mask.
+        if f.kind == "JSON_NUMERIC_SECRET":
+            replacement = json.dumps(replacement)
+        out.append(replacement)
         last = f.end
     out.append(text[last:])
     public_findings = (
