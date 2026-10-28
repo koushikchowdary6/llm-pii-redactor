@@ -205,7 +205,7 @@ def _find_ipv6(text: str) -> list[Finding]:
 
 
 def _find_yaml_block_secrets(text: str) -> list[Finding]:
-    """Claim complete YAML literal/folded credential blocks, not just '|'/'>'. 
+    """Claim complete YAML literal/folded credential blocks, not just '|'/'>'.
 
     A credential like `password: |\n  secret` otherwise has only its
     block indicator redacted while the indented secret leaks into the prompt.
@@ -218,7 +218,7 @@ def _find_yaml_block_secrets(text: str) -> list[Finding]:
         if not indicator.fullmatch(match.group("secret").strip()):
             continue
         line_start = text.rfind("\n", 0, match.start()) + 1
-        key_indent = re.match(r"[ \\t]*", text[line_start:]).group().expandtabs(8)
+        key_indent = re.match(r"[ \t]*", text[line_start:]).group().expandtabs(8)
         base_indent = len(key_indent)
         first_newline = text.find("\n", match.end("secret"))
         if first_newline < 0:
@@ -231,7 +231,7 @@ def _find_yaml_block_secrets(text: str) -> list[Finding]:
                 line_end = len(text)
             line = text[cursor:line_end]
             if line.strip():
-                indent = len(re.match(r"[ \\t]*", line).group().expandtabs(8))
+                indent = len(re.match(r"[ \t]*", line).group().expandtabs(8))
                 if indent <= base_indent:
                     break
             end = line_end
