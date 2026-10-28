@@ -64,11 +64,11 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     # YAML-style configuration commonly uses "password: value" instead of
     # .env "=" assignments. Short and low-entropy secrets must not escape
     # redaction just because they lack a provider prefix. Match only a
-    # standalone credential key, preserving its indentation and key name.
+    # standalone credential key (including quoted YAML keys), preserving its indentation and key name.
     # Keep trailing YAML comments outside the secret span; an unquoted
     # value may contain spaces or a literal '#' without a preceding space.
     ("CONFIG_SECRET", re.compile(
-        r"""^[ \t]*(?:aws[_-]?(?:secret[_-]?access[_-]?key|session[_-]?token|access[_-]?key[_-]?id)|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|password|passwd|secret|signature|token|session[_-]?token|webhook[_-]?secret)[ \t]*:[ \t]*(?P<secret>"(?:\\.|[^"\\\r\n])+"|'(?:\\.|[^'\\\r\n])+'|[^ \t\r\n#"'][^\r\n]*?)(?=[ \t]+\#.*\r?$|[ \t]*\r?$)""",
+        r"""^[ \t]*(?P<quote>["']?)(?:aws[_-]?(?:secret[_-]?access[_-]?key|session[_-]?token|access[_-]?key[_-]?id)|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|password|passwd|secret|signature|token|session[_-]?token|webhook[_-]?secret)(?P=quote)[ \t]*:[ \t]*(?P<secret>"(?:\\.|[^"\\\r\n])+"|'(?:\\.|[^'\\\r\n])+'|[^ \t\r\n#"'][^\r\n]*?)(?=[ \t]+\#.*\r?$|[ \t]*\r?$)""",
         re.IGNORECASE | re.MULTILINE,
     )),
     ("JSON_SECRET", re.compile(
