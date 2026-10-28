@@ -282,7 +282,14 @@ def detect(text: str) -> list[Finding]:
         ))
         claimed.append(match.span())
 
-    # YAML literal/folded scalars may contain multiple secret lines. Claim\n    # the entire indented block before ordinary one-line config matching.\n    for finding in _find_yaml_block_secrets(text):\n        if not overlaps(finding.start, finding.end):\n            findings.append(finding)\n            claimed.append((finding.start, finding.end))\n\n    # Claim JSON credential strings before IP/provider/entropy detectors.
+    # YAML literal/folded scalars may contain multiple secret lines. Claim
+    # the entire indented block before ordinary one-line config matching.
+    for finding in _find_yaml_block_secrets(text):
+        if not overlaps(finding.start, finding.end):
+            findings.append(finding)
+            claimed.append((finding.start, finding.end))
+
+    # Claim JSON credential strings before IP/provider/entropy detectors.
     # Otherwise a nested email or token can consume only part of a value,
     # leaving surrounding credential bytes visible in the sanitized JSON.
     for kind in ("JSON_SECRET", "JSON_NUMERIC_SECRET"):
