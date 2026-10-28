@@ -37,12 +37,12 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
         r"(?im)^[ \t]*(?:Proxy-)?Authorization[ \t]*:[ \t]*"
         r"(?P<value>(?:[^\r\n \t][^\r\n]*(?:\r?\n[ \t]+[^\r\n]*)*|\r?\n[ \t]+[^\r\n \t][^\r\n]*(?:\r?\n[ \t]+[^\r\n]*)*))"
     )),
-    # Opaque credentials in common HTTP headers can be short or low entropy.
+    # Opaque credentials in common HTTP and cloud/AI-provider headers can be short or low entropy.
     # Redact the entire value, not just a token-looking substring. Restrict
     # matching to header lines so ordinary prose is unaffected. Include
     # folded continuation lines in the value to prevent partial disclosure.
     ("SENSITIVE_HEADER", re.compile(
-        r"(?im)^[ \t]*(?:X-API-Key|API-Key|X-Auth-Token|X-Access-Token|Cookie|Set-Cookie)"
+        r"(?im)^[ \t]*(?:X-API-Key|API-Key|X-API-Token|X-Auth-Token|X-Access-Token|X-Goog-Api-Key|X-Amz-Security-Token|X-Functions-Key|Cookie|Set-Cookie)"
         r"[ \t]*:[ \t]*(?P<value>(?:[^\r\n \t][^\r\n]*(?:\r?\n[ \t]+[^\r\n]*)*|\r?\n[ \t]+[^\r\n \t][^\r\n]*(?:\r?\n[ \t]+[^\r\n]*)*))"
     )),
     # Signed URLs, OAuth fragments, and form-encoded request bodies can
