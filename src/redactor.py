@@ -37,12 +37,12 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
         r"(?im)^[ \t]*(?:Proxy-)?Authorization[ \t]*:[ \t]*"
         r"(?P<value>(?:[^\r\n \t][^\r\n]*(?:\r?\n[ \t]+[^\r\n]*)*|\r?\n[ \t]+[^\r\n \t][^\r\n]*(?:\r?\n[ \t]+[^\r\n]*)*))"
     )),
-    # Opaque credentials in common HTTP headers can be short or low entropy.
+    # Opaque credentials in common HTTP and cloud/AI-provider headers can be short or low entropy.
     # Redact the entire value, not just a token-looking substring. Restrict
     # matching to header lines so ordinary prose is unaffected. Include
     # folded continuation lines in the value to prevent partial disclosure.
     ("SENSITIVE_HEADER", re.compile(
-        r"(?im)^[ \t]*(?:X-API-Key|API-Key|X-Auth-Token|X-Access-Token|Cookie|Set-Cookie)"
+        r"(?im)^[ \t]*(?:X-API-Key|API-Key|X-API-Token|X-Auth-Token|X-Access-Token|X-Goog-Api-Key|X-Amz-Security-Token|X-Functions-Key|Cookie|Set-Cookie)"
         r"[ \t]*:[ \t]*(?P<value>(?:[^\r\n \t][^\r\n]*(?:\r?\n[ \t]+[^\r\n]*)*|\r?\n[ \t]+[^\r\n \t][^\r\n]*(?:\r?\n[ \t]+[^\r\n]*)*))"
     )),
     # Signed URLs, OAuth fragments, and form-encoded request bodies can
@@ -197,12 +197,16 @@ def detect(text: str) -> list[Finding]:
     # preempt the full-value match and leave the rest of the cookie exposed.
     findings: list[Finding] = []
     claimed: list[tuple[int, int]] = []
+    # Header names are public metadata, not high-entropy secret values.
+    # Preserve the header name even when its hyphenated spelling looks random.
+    sensitive_header_name_spans: list[tuple[int, int]] = []
 
     def overlaps(s: int, e: int) -> bool:
         return any(s < ce and cs < e for cs, ce in claimed)
 
     for match in _PATTERN_MAP["SENSITIVE_HEADER"].finditer(text):
         start, end = match.span("value")
+        sensitive_header_name_spans.append((match.start(), start))
         findings.append(Finding("SENSITIVE_HEADER", match.group("value"), start, end))
         claimed.append((start, end))
 
@@ -259,7 +263,9 @@ def detect(text: str) -> list[Finding]:
             claimed.append((s, e))
 
     for f in _find_high_entropy(text):
-        if not overlaps(f.start, f.end):
+        if (not overlaps(f.start, f.end)
+                and not any(start <= f.start and f.end <= end
+                            for start, end in sensitive_header_name_spans)):
             findings.append(f)
             claimed.append((f.start, f.end))
 
