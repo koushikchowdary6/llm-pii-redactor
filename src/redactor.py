@@ -197,12 +197,16 @@ def detect(text: str) -> list[Finding]:
     # preempt the full-value match and leave the rest of the cookie exposed.
     findings: list[Finding] = []
     claimed: list[tuple[int, int]] = []
+    # Header names are public metadata, not high-entropy secret values.
+    # Preserve the header name even when its hyphenated spelling looks random.
+    sensitive_header_name_spans: list[tuple[int, int]] = []
 
     def overlaps(s: int, e: int) -> bool:
         return any(s < ce and cs < e for cs, ce in claimed)
 
     for match in _PATTERN_MAP["SENSITIVE_HEADER"].finditer(text):
         start, end = match.span("value")
+        sensitive_header_name_spans.append((match.start(), start))
         findings.append(Finding("SENSITIVE_HEADER", match.group("value"), start, end))
         claimed.append((start, end))
 
@@ -259,7 +263,9 @@ def detect(text: str) -> list[Finding]:
             claimed.append((s, e))
 
     for f in _find_high_entropy(text):
-        if not overlaps(f.start, f.end):
+        if (not overlaps(f.start, f.end)
+                and not any(start <= f.start and f.end <= end
+                            for start, end in sensitive_header_name_spans)):
             findings.append(f)
             claimed.append((f.start, f.end))
 
