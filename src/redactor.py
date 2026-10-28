@@ -204,6 +204,45 @@ def _find_ipv6(text: str) -> list[Finding]:
     return findings
 
 
+def _find_yaml_block_secrets(text: str) -> list[Finding]:
+    """Claim complete YAML literal/folded credential blocks, not just '|'/'>'. 
+
+    A credential like `password: |\n  secret` otherwise has only its
+    block indicator redacted while the indented secret leaks into the prompt.
+    Stop at the first nonblank line that is not more indented than the key.
+    This is a bounded text guard, not a complete YAML parser.
+    """
+    findings = []
+    indicator = re.compile(r"[|>](?:[+-][1-9]?|[1-9][+-]?)?")
+    for match in _PATTERN_MAP["CONFIG_SECRET"].finditer(text):
+        if not indicator.fullmatch(match.group("secret").strip()):
+            continue
+        line_start = text.rfind("\n", 0, match.start()) + 1
+        key_indent = re.match(r"[ \\t]*", text[line_start:]).group().expandtabs(8)
+        base_indent = len(key_indent)
+        first_newline = text.find("\n", match.end("secret"))
+        if first_newline < 0:
+            continue
+        start, end = match.span("secret")
+        cursor = first_newline + 1
+        while cursor < len(text):
+            line_end = text.find("\n", cursor)
+            if line_end < 0:
+                line_end = len(text)
+            line = text[cursor:line_end]
+            if line.strip():
+                indent = len(re.match(r"[ \\t]*", line).group().expandtabs(8))
+                if indent <= base_indent:
+                    break
+            end = line_end
+            if line_end == len(text):
+                break
+            cursor = line_end + 1
+        if end > match.end("secret"):
+            findings.append(Finding("CONFIG_SECRET", text[start:end], start, end))
+    return findings
+
+
 def detect(text: str) -> list[Finding]:
     # Claim complete sensitive header values before token/IP detectors.
     # Otherwise an IPv6 literal or provider key inside a Cookie header can
@@ -243,7 +282,7 @@ def detect(text: str) -> list[Finding]:
         ))
         claimed.append(match.span())
 
-    # Claim JSON credential strings before IP/provider/entropy detectors.
+    # YAML literal/folded scalars may contain multiple secret lines. Claim\n    # the entire indented block before ordinary one-line config matching.\n    for finding in _find_yaml_block_secrets(text):\n        if not overlaps(finding.start, finding.end):\n            findings.append(finding)\n            claimed.append((finding.start, finding.end))\n\n    # Claim JSON credential strings before IP/provider/entropy detectors.
     # Otherwise a nested email or token can consume only part of a value,
     # leaving surrounding credential bytes visible in the sanitized JSON.
     for kind in ("JSON_SECRET", "JSON_NUMERIC_SECRET"):
