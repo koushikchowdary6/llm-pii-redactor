@@ -322,10 +322,27 @@ def detect(text: str) -> list[Finding]:
             findings.append(Finding(kind, val, s, e))
             claimed.append((s, e))
 
+    # Field names in JSON/YAML are structural metadata, not secret values.
+    # The entropy fallback can otherwise mask a long credential-like *key*
+    # (e.g. x_amz_security_token), corrupting JSON/YAML while leaving the
+    # actual value's dedicated redaction intact. Preserve complete keys,
+    # including unknown but similarly named nonsecret metadata fields.
+    structured_key_spans = [
+        match.span()
+        for match in re.finditer(r'"(?:\\\\.|[^"\\\\])*"(?=[ \\t\\r\\n]*:)', text)
+    ]
+    structured_key_spans.extend(
+        match.span("key")
+        for match in re.finditer(
+            r"""(?m)^[ \\t]*(?P<key>"[^"\\r\\n]+"|'[^'\\r\\n]+'|[A-Za-z_][A-Za-z0-9_-]*)[ \\t]*:""",
+            text,
+        )
+    )
+
     for f in _find_high_entropy(text):
         if (not overlaps(f.start, f.end)
                 and not any(start <= f.start and f.end <= end
-                            for start, end in sensitive_header_name_spans)):
+                            for start, end in (sensitive_header_name_spans + structured_key_spans))):
             findings.append(f)
             claimed.append((f.start, f.end))
 
