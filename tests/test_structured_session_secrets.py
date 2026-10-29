@@ -66,3 +66,16 @@ def test_nonsecret_similar_field_names_are_preserved():
     safe, findings = redact(source)
     assert safe == source
     assert findings == []
+
+
+def test_structured_metadata_keys_do_not_disable_entropy_value_detection():
+    source = json.dumps({
+        "x_amz_security_token_name": "plain",
+        "payload": "aBcD1234+/qWeR5678_-tYuI9012",
+    })
+    safe, findings = redact(source)
+    assert json.loads(safe) == {
+        "x_amz_security_token_name": "plain",
+        "payload": "[REDACTED:HIGH_ENTROPY_SECRET]",
+    }
+    assert [f.kind for f in findings] == ["HIGH_ENTROPY_SECRET"]
