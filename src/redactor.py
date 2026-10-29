@@ -68,13 +68,13 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     # Keep trailing YAML comments outside the secret span; an unquoted
     # value may contain spaces or a literal '#' without a preceding space.
     ("CONFIG_SECRET", re.compile(
-        r"""^[ \t]*(?P<quote>["']?)(?:aws[_-]?(?:secret[_-]?access[_-]?key|session[_-]?token|access[_-]?key[_-]?id)|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|password|passwd|secret|signature|token|session[_-]?token|webhook[_-]?secret)(?P=quote)[ \t]*:[ \t]*(?P<secret>"(?:\\.|[^"\\\r\n])+"|'(?:\\.|[^'\\\r\n])+'|[^ \t\r\n#"'][^\r\n]*?)(?=[ \t]+\#.*\r?$|[ \t]*\r?$)""",
+        r"""^[ \t]*(?P<quote>["']?)(?:aws[_-]?(?:secret[_-]?access[_-]?key|session[_-]?token|access[_-]?key[_-]?id)|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|password|passwd|secret|signature|token|session[_-]?token|webhook[_-]?secret|cookie|set[_-]?cookie|proxy[_-]?authorization|x[_-]?amz[_-]?security[_-]?token)(?P=quote)[ \t]*:[ \t]*(?P<secret>"(?:\\.|[^"\\\r\n])+"|'(?:\\.|[^'\\\r\n])+'|[^ \t\r\n#"'][^\r\n]*?)(?=[ \t]+\#.*\r?$|[ \t]*\r?$)""",
         re.IGNORECASE | re.MULTILINE,
     )),
     ("JSON_SECRET", re.compile(
         r'"(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|'
         r'client[_-]?secret|aws[_-]?(?:secret[_-]?access[_-]?key|session[_-]?token|access[_-]?key[_-]?id)|password|passwd|secret|token|authorization|'
-        r'session[_-]?token|webhook[_-]?secret)"[ \t\r\n]*:[ \t\r\n]*'
+        r'session[_-]?token|webhook[_-]?secret|cookie|set[_-]?cookie|proxy[_-]?authorization|x[_-]?amz[_-]?security[_-]?token)"[ \t\r\n]*:[ \t\r\n]*'
         r'"(?P<value>(?:\\.|[^"\\])+)"',
         re.IGNORECASE,
     )),
@@ -85,7 +85,7 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     ("JSON_NUMERIC_SECRET", re.compile(
         r'"(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|'
         r'client[_-]?secret|aws[_-]?(?:secret[_-]?access[_-]?key|session[_-]?token|access[_-]?key[_-]?id)|'
-        r'password|passwd|secret|token|authorization|session[_-]?token|webhook[_-]?secret)"'
+        r'password|passwd|secret|token|authorization|session[_-]?token|webhook[_-]?secret|cookie|set[_-]?cookie|proxy[_-]?authorization|x[_-]?amz[_-]?security[_-]?token)"'
         r'[ \t\r\n]*:[ \t\r\n]*(?P<value>-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)'
         r'(?=[ \t\r\n]*[,}\]])',
         re.IGNORECASE,
