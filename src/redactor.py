@@ -68,13 +68,13 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     # Keep trailing YAML comments outside the secret span; an unquoted
     # value may contain spaces or a literal '#' without a preceding space.
     ("CONFIG_SECRET", re.compile(
-        r"""^[ \t]*(?P<quote>["']?)(?:aws[_-]?(?:secret[_-]?access[_-]?key|session[_-]?token|access[_-]?key[_-]?id)|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|password|passwd|secret|signature|token|session[_-]?token|webhook[_-]?secret)(?P=quote)[ \t]*:[ \t]*(?P<secret>"(?:\\.|[^"\\\r\n])+"|'(?:\\.|[^'\\\r\n])+'|[^ \t\r\n#"'][^\r\n]*?)(?=[ \t]+\#.*\r?$|[ \t]*\r?$)""",
+        r"""^[ \t]*(?P<quote>["']?)(?:aws[_-]?(?:secret[_-]?access[_-]?key|session[_-]?token|access[_-]?key[_-]?id)|api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|client[_-]?secret|password|passwd|secret|signature|token|session[_-]?token|webhook[_-]?secret|cookie|set[_-]?cookie|proxy[_-]?authorization|x[_-]?amz[_-]?security[_-]?token)(?P=quote)[ \t]*:[ \t]*(?P<secret>"(?:\\.|[^"\\\r\n])+"|'(?:\\.|[^'\\\r\n])+'|[^ \t\r\n#"'][^\r\n]*?)(?=[ \t]+\#.*\r?$|[ \t]*\r?$)""",
         re.IGNORECASE | re.MULTILINE,
     )),
     ("JSON_SECRET", re.compile(
         r'"(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|'
         r'client[_-]?secret|aws[_-]?(?:secret[_-]?access[_-]?key|session[_-]?token|access[_-]?key[_-]?id)|password|passwd|secret|token|authorization|'
-        r'session[_-]?token|webhook[_-]?secret)"[ \t\r\n]*:[ \t\r\n]*'
+        r'session[_-]?token|webhook[_-]?secret|cookie|set[_-]?cookie|proxy[_-]?authorization|x[_-]?amz[_-]?security[_-]?token)"[ \t\r\n]*:[ \t\r\n]*'
         r'"(?P<value>(?:\\.|[^"\\])+)"',
         re.IGNORECASE,
     )),
@@ -85,7 +85,7 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     ("JSON_NUMERIC_SECRET", re.compile(
         r'"(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|'
         r'client[_-]?secret|aws[_-]?(?:secret[_-]?access[_-]?key|session[_-]?token|access[_-]?key[_-]?id)|'
-        r'password|passwd|secret|token|authorization|session[_-]?token|webhook[_-]?secret)"'
+        r'password|passwd|secret|token|authorization|session[_-]?token|webhook[_-]?secret|cookie|set[_-]?cookie|proxy[_-]?authorization|x[_-]?amz[_-]?security[_-]?token)"'
         r'[ \t\r\n]*:[ \t\r\n]*(?P<value>-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)'
         r'(?=[ \t\r\n]*[,}\]])',
         re.IGNORECASE,
@@ -322,10 +322,27 @@ def detect(text: str) -> list[Finding]:
             findings.append(Finding(kind, val, s, e))
             claimed.append((s, e))
 
+    # Field names in JSON/YAML are structural metadata, not secret values.
+    # The entropy fallback can otherwise mask a long credential-like *key*
+    # (e.g. x_amz_security_token), corrupting JSON/YAML while leaving the
+    # actual value's dedicated redaction intact. Preserve complete keys,
+    # including unknown but similarly named nonsecret metadata fields.
+    structured_key_spans = [
+        match.span()
+        for match in re.finditer(r'"(?:\\\\.|[^"\\\\])*"(?=[ \\t\\r\\n]*:)', text)
+    ]
+    structured_key_spans.extend(
+        match.span("key")
+        for match in re.finditer(
+            r"""(?m)^[ \\t]*(?P<key>"[^"\\r\\n]+"|'[^'\\r\\n]+'|[A-Za-z_][A-Za-z0-9_-]*)[ \\t]*:""",
+            text,
+        )
+    )
+
     for f in _find_high_entropy(text):
         if (not overlaps(f.start, f.end)
                 and not any(start <= f.start and f.end <= end
-                            for start, end in sensitive_header_name_spans)):
+                            for start, end in (sensitive_header_name_spans + structured_key_spans))):
             findings.append(f)
             claimed.append((f.start, f.end))
 
