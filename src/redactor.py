@@ -32,10 +32,12 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     # prefix or enough entropy for generic detection. Redact the *whole* header
     # value (including scheme) so short or repetitive secrets cannot leak.
     # Only match actual header lines, not prose mentioning authorization.
+    # Include common reverse-proxy forwarding aliases that may carry opaque
+    # credentials even when they lack a recognizable provider prefix.
     # Legacy folded continuation lines belong to the same credential and
     # must not survive redaction as a separate line.
     ("AUTHORIZATION_CREDENTIAL", re.compile(
-        r"(?im)^[ \t]*(?:Proxy-)?Authorization[ \t]*:[ \t]*"
+        r"(?im)^[ \t]*(?:(?:Proxy|X|X-Forwarded|X-Original)-)?Authorization[ \t]*:[ \t]*"
         r"(?P<value>(?:[^\r\n \t][^\r\n]*(?:\r?\n[ \t]+[^\r\n]*)*|\r?\n[ \t]+[^\r\n \t][^\r\n]*(?:\r?\n[ \t]+[^\r\n]*)*))"
     )),
     # Opaque credentials in common HTTP and cloud/AI-provider headers can be short or low entropy.
