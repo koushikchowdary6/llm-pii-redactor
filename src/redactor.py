@@ -363,10 +363,14 @@ def redact(
     for f in findings:
         out.append(text[last:f.start])
         replacement = mask.format(kind=f.kind)
-        # JSON numbers cannot be replaced with bare [REDACTED] text without
-        # breaking the surrounding JSON document. Quote and escape the mask.
+        # JSON numeric secrets need a complete quoted string replacement.
+        # JSON string secrets already have surrounding quotes: escape only
+        # the replacement contents. A custom mask containing quotes, slashes,
+        # controls, or non-ASCII text must not corrupt the sanitized JSON.
         if f.kind == "JSON_NUMERIC_SECRET":
             replacement = json.dumps(replacement)
+        elif f.kind == "JSON_SECRET":
+            replacement = json.dumps(replacement)[1:-1]
         out.append(replacement)
         last = f.end
     out.append(text[last:])
