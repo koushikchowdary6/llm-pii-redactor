@@ -9,6 +9,8 @@ that data then leaves your trust boundary. This strips it first.
 
 Pure Python standard library — deterministic, offline, no dependencies.
 
+**Input budget:** the library and CLI reject prompts over 1,000,000 Unicode characters instead of returning partially sanitized content. CLI file and stdin reads stop at the first character past the limit and exit nonzero without printing input. Treat rejection as a blocked request, not as permission to send the original text to a model. This is a character limit, not a byte/memory guarantee; the regex-based detector remains defense-in-depth rather than a complete DLP system.
+
 ## What it catches
 
 **Pattern detectors:** email, phone, US SSN, credit card (with a **Luhn
