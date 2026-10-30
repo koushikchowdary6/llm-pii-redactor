@@ -1,103 +1,112 @@
-# LLM PII / Secret Redactor 🕶️🤖
+# Document Review — redaction bundles for ingestion workflows
 
-[![CI](https://github.com/koushikchowdary6/llm-pii-redactor/actions/workflows/ci.yml/badge.svg)](https://github.com/koushikchowdary6/llm-pii-redactor/actions/workflows/ci.yml)
+A local document-ingestion stage that applies the repository's real redactor
+to UTF-8 text, writes sanitized content, and attaches a review manifest. This
+implements the text-review portion of an OCR/document-processing architecture;
+OCR and PDF pixel masking are not implemented or claimed.
 
-An **AI-safety guardrail** that detects and redacts sensitive data — PII and
-secrets — from text **before it's sent to an LLM** (or logged, or shared).
-People routinely paste emails, API keys, and customer records into prompts;
-that data then leaves your trust boundary. This strips it first.
+## Run
 
-Pure Python standard library — deterministic, offline, no dependencies.
-
-**Input budget:** the library and CLI reject prompts over 1,000,000 Unicode characters instead of returning partially sanitized content. CLI file and stdin reads stop at the first character past the limit and exit nonzero without printing input. Treat rejection as a blocked request, not as permission to send the original text to a model. This is a character limit, not a byte/memory guarantee; the regex-based detector remains defense-in-depth rather than a complete DLP system.
-
-## What it catches
-
-**Pattern detectors:** email, phone, US SSN, credit card (with a **Luhn
-checksum** so fake 16-digit numbers aren't flagged), IPv4 and validated IPv6 literals (including bracketed and scoped forms), AWS access keys,
-JWTs, GitHub classic/fine-grained access tokens, OpenAI (`sk-`, `sk-proj-`, `sk-svcacct-`) and Anthropic (`sk-ant-`) API key prefixes, and private-key blocks. HTTP `Authorization` and `Proxy-Authorization` headers are redacted as complete opaque credential lines, including Digest, AWS SigV4, custom schemes, and multi-field values that could otherwise leak a trailing secret. For a single recognized provider token under Bearer/Basic/Token, the more specific finding type is preserved. Bare scheme names without credentials are not redacted. Common credential-bearing `X-API-Key`, `API-Key`, `X-Auth-Token`, `X-Access-Token`, `X-API-Token`, forwarded/original `API-Key` and `Access-Token` aliases, `X-API-Secret`, `X-Client-Secret`, Google Gemini `X-Goog-Api-Key`, AWS `X-Amz-Security-Token`, Azure Functions `X-Functions-Key`, `Cookie`, and `Set-Cookie` header values are redacted as complete values, even when their contents are short, low-entropy, or contain multiple credentials. Non-sensitive headers are preserved. Legacy folded credentials are also redacted when the first header line is blank and the secret appears only on an indented continuation; truly empty headers remain untouched.
-
-**URL and form credential redaction:** known secret-bearing assignment keys (such as `sig`, `X-Amz-Signature`, `client_secret`, and `access_token`) are masked even for low-entropy values in URL queries, OAuth fragments, and `application/x-www-form-urlencoded` request bodies. The first form field does not need a `?` or `&` delimiter. Space-padded `.env` assignments and single/double-quoted values (including embedded spaces or escaped quotes) are also masked as complete values; the assignment key remains visible, but quote delimiters are replaced along with the secret. Empty assignments remain unchanged. Ordinary URL fragments and non-secret parameters remain visible. This is key-name-based matching, not full URL/form parsing or detection of every custom credential name.
-
-**AWS shared-credential fields:** standard `aws_secret_access_key`, `aws_session_token`, and `aws_access_key_id` names (including hyphenated variants) are recognized in `.env`/form assignments, YAML-style lines, and quoted JSON string fields. This protects even short synthetic or low-entropy values that a generic entropy detector would miss. Low-entropy session/cookie credentials and cloud security tokens are also recognized in JSON/YAML configuration fields. Other credential aliases and arbitrary configuration formats are not guaranteed to be detected.
-
-**YAML-style configuration credentials:** standalone keys such as `password: aaaa`, `client_secret: "short secret"`, `set_cookie: value`, `proxy_authorization: value`, and `x_amz_security_token: value` have their values masked even when short or low-entropy. The key name, indentation, and trailing `#` comments remain visible. Quoted values with embedded spaces and plain scalar values are supported. Literal (`|`) and folded (`>`) YAML block-scalar secrets under recognized keys are redacted through their indented content, including blank lines and common chomping/indent indicators. The next dedented nonblank field is preserved. This is a targeted text guard, **not a YAML parser**: anchors, custom secret names, malformed indentation, and complex YAML constructs may need additional protection. Offline regression tests cover multiline leakage and adjacent-field preservation.
-
-**JSON credential fields:** quoted string values under keys such as `api_key`, `access_token`, `client_secret`, `password`, `authorization`, `proxy_authorization`, `cookie`, `set_cookie`, and `x_amz_security_token` are redacted even when short or low-entropy. Unquoted **numeric** credential values under these keys are also masked, with a JSON-quoted replacement so the output remains parseable (the value's JSON type changes to string). Escaped quotes and backslashes inside string values are handled. Empty values, `null`, booleans, and arbitrary custom field names are not covered by this rule; JSON matching is pattern-based, not a full parser, and malformed input is not guaranteed to be repaired.
-
-**Entropy detector:** long, high-entropy tokens that *look* like secrets
-(random API keys) even when they match no known pattern — while leaving
-ordinary long words alone.
-
-## Usage
+From the repository root, Python 3.10+ with no third-party dependencies:
 
 ```bash
-# redact a file
-python src/redactor.py notes.txt
-
-# redact stdin, with a summary of what was removed
-echo "email a@b.com, key AKIAIOSFODNN7EXAMPLE" | python src/redactor.py --report
+python review.py examples/synthetic.txt /tmp/review-bundle
+cat /tmp/review-bundle/sanitized.txt
+cat /tmp/review-bundle/manifest.json
+python -m unittest discover -s . -v
 ```
 
-```
-email [REDACTED:EMAIL], key [REDACTED:AWS_ACCESS_KEY]
---- redaction report ---
-  AWS_ACCESS_KEY: 1
-  EMAIL: 1
-```
+Choose a new destination for each run. Existing directories are rejected.
+The synthetic fixture contains an email and SSN for a reproducible demonstration.
+No client or patient documents are included.
 
-Or use it as a library, e.g. in an LLM app's input pipeline:
+## What happens
 
-```python
-from redactor import redact
-safe_text, findings = redact(user_input)
-# send only safe_text to the model
-# for audit telemetry, log only finding types/counts — never Finding.value
-```
+1. Read at most the redactor's character budget plus one; reject oversized input.
+2. Detect and redact using `src/redactor.py`, without making external API calls.
+3. Record types, offsets, counts and content fingerprints; omit raw matches and
+   source filenames from the manifest.
+4. Stage both files in a private directory and rename it into place.
+5. Mark every bundle `pending_manual_review`, including zero-finding documents.
 
-## Tests
+Offsets refer to the original text, not the redacted output. SHA-256 digests
+identify content but do not encrypt it or prevent guessing predictable inputs.
+The bundle directory is mode 0700 on POSIX systems. The rename publishes both
+files together on the same filesystem, but is not a power-loss durability
+promise. This CLI assumes one writer per destination.
+
+## Manual decision and gated export
+
+The bundle is **pending** until a human reviews `sanitized.txt`. An explicit
+local decision is required before this tool exports sanitized text:
 
 ```bash
-PYTHONPATH=src python -m pytest tests/ -v
+python decision.py decide /tmp/review-bundle \
+  --status approved --reviewer "demo reviewer" \
+  --rationale "Reviewed the synthetic redacted text"
+python decision.py export \
+  /tmp/review-bundle /tmp/approved-sanitized.txt
 ```
 
-Tests cover detector behavior, GitHub/OpenAI/Anthropic token formats, Luhn validation, entropy-based secret detection,
-clean-text pass-through, complete/incomplete PEM private-key handling, and
-multiple adjacent key blocks.
+Use `--status rejected` to record a rejection; rejected and pending bundles
+cannot be exported by this CLI. The decision is written once to
+`decision.json` with reviewer, rationale, timestamp, and sanitized-content
+digest. Exports refuse to overwrite existing files and verify the sanitized
+content against both manifest and decision digests. Review decisions and
+export files are created with owner-only permissions on POSIX.
 
-## Where it fits
+This is **local self-attestation**, not verified reviewer identity, a signed
+audit log, tamper-proof storage, access control for other tools, or a guarantee
+that pattern-based redaction catches every identifier. A user with filesystem
+write access can bypass this CLI or edit both records. Downstream systems must
+use the gated export, not read `sanitized.txt` directly.
 
-This is a companion to my
-[prompt-injection-detector](https://github.com/koushikchowdary6/prompt-injection-detector):
-one guards the *input* against malicious instructions, this guards it against
-*data leakage*. Both are the kind of input-side controls a responsible LLM
-application needs.
+## Review procedure
 
-## ⚠️ Honesty about scope
+Inspect sanitized text before downstream indexing. Pattern detection can miss
+names and contextual identifiers. Review decisions are manual; this tool does
+not contain an approval UI or authorize release. Never feed the original file
+to a downstream model when this stage fails. Use synthetic data for demos.
 
-Redaction is a strong safety net, not a guarantee. Regex + entropy detection
-catches structured and obviously-random secrets, but can miss unusually
-formatted data, short/unknown provider tokens, or context-dependent PII (a name in a sentence, an internal
-project codename). Use it as one layer of defense-in-depth, tuned to your data,
-not as a sole control.
+## Validation and scope
 
-## Author
+Four bundle tests plus ten decision tests check raw-email absence, overwrite
+rejection, budget failure, pending/rejected export blocking, tamper detection,
+reviewer requirements, and approved sanitized export.
+No OCR accuracy, PHI recall, HIPAA compliance, model performance or production
+throughput is claimed. A future OCR adapter must preserve page coordinates and
+validate final rendered pixel masking separately from text redaction.
 
-Koushik Chowdary — [LinkedIn](https://linkedin.com/in/koushik-chowdary) · [GitHub](https://github.com/koushikchowdary6)
+## Interview walkthrough
 
+Run the fixture; inspect the sanitized output and metadata. Then try a sentence
+with an ordinary person's name to show why a zero-finding report is not proof
+of de-identification. Explain the trust boundary before retrieval indexing and
+why audit logs should not copy the secrets the system just removed.
 
-## Safe audit logging
+## Architecture
 
-`Finding.value` intentionally contains the original matched secret/PII so callers
-can inspect a detection in memory. Do **not** write that value to application logs,
-telemetry, traces, or analytics. Prefer aggregate metadata such as finding kinds
-and counts:
-
-```python
-from collections import Counter
-
-safe_text, findings = redact(user_input)
-audit_counts = Counter(f.kind for f in findings)
+```mermaid
+flowchart TD
+  A["UTF-8 source text"] --> B["Pattern redactor"]
+  B --> C["Sanitized text and manifest"]
+  C --> D["Manual decision"]
+  D -->|approved| E["Digest-checked export"]
+  D -->|rejected| F["Blocked"]
 ```
 
-This avoids turning the redaction layer itself into a secondary data-leak path.
+## Provenance
+
+See [PROVENANCE.md](PROVENANCE.md) for the exact upstream snapshot and file mapping.
+The existing upstream license is retained unchanged; no new license grant is introduced.
+
+## Full regression suite
+
+Runtime uses Python's standard library only. Install test dependencies and run:
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m pytest -q
+```
+
+This includes the upstream redactor regression tests as well as bundle and decision tests.

@@ -1,4 +1,8 @@
 __pycache__/
-*.pyc
+
 .venv/
 .pytest_cache/
+*.pyc
+.env
+bundles/
+released/
