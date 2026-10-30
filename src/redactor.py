@@ -25,6 +25,10 @@ import re
 import sys
 from dataclasses import dataclass
 
+# A bounded pre-LLM guardrail must not exhaust resources on untrusted prompts.
+# Oversized input is rejected, never partially redacted and forwarded.
+MAX_INPUT_CHARS = 1_000_000
+
 # --- Pattern detectors ---------------------------------------------------------
 
 _PATTERNS: list[tuple[str, re.Pattern]] = [
@@ -246,6 +250,8 @@ def _find_yaml_block_secrets(text: str) -> list[Finding]:
 
 
 def detect(text: str) -> list[Finding]:
+    if len(text) > MAX_INPUT_CHARS:
+        raise ValueError(f"input exceeds {MAX_INPUT_CHARS} characters")
     # Claim complete sensitive header values before token/IP detectors.
     # Otherwise an IPv6 literal or provider key inside a Cookie header can
     # preempt the full-value match and leave the rest of the cookie exposed.
@@ -389,7 +395,13 @@ def main() -> int:
     parser.add_argument("--report", action="store_true", help="also print a summary of what was redacted")
     args = parser.parse_args()
 
-    text = open(args.path).read() if args.path else sys.stdin.read()
+    if args.path:
+        with open(args.path, encoding="utf-8") as stream:
+            text = stream.read(MAX_INPUT_CHARS + 1)
+    else:
+        text = sys.stdin.read(MAX_INPUT_CHARS + 1)
+    if len(text) > MAX_INPUT_CHARS:
+        parser.error(f"input exceeds {MAX_INPUT_CHARS} characters; nothing was redacted")
     redacted, findings = redact(text)
     sys.stdout.write(redacted)
     if args.report:
