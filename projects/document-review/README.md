@@ -35,6 +35,32 @@ The bundle directory is mode 0700 on POSIX systems. The rename publishes both
 files together on the same filesystem, but is not a power-loss durability
 promise. This CLI assumes one writer per destination.
 
+## Manual decision and gated export
+
+The bundle is **pending** until a human reviews `sanitized.txt`. An explicit
+local decision is required before this tool exports sanitized text:
+
+```bash
+python projects/document-review/decision.py decide /tmp/review-bundle \
+  --status approved --reviewer "demo reviewer" \
+  --rationale "Reviewed the synthetic redacted text"
+python projects/document-review/decision.py export \
+  /tmp/review-bundle /tmp/approved-sanitized.txt
+```
+
+Use `--status rejected` to record a rejection; rejected and pending bundles
+cannot be exported by this CLI. The decision is written once to
+`decision.json` with reviewer, rationale, timestamp, and sanitized-content
+digest. Exports refuse to overwrite existing files and verify the sanitized
+content against both manifest and decision digests. Review decisions and
+export files are created with owner-only permissions on POSIX.
+
+This is **local self-attestation**, not verified reviewer identity, a signed
+audit log, tamper-proof storage, access control for other tools, or a guarantee
+that pattern-based redaction catches every identifier. A user with filesystem
+write access can bypass this CLI or edit both records. Downstream systems must
+use the gated export, not read `sanitized.txt` directly.
+
 ## Review procedure
 
 Inspect sanitized text before downstream indexing. Pattern detection can miss
@@ -44,8 +70,9 @@ to a downstream model when this stage fails. Use synthetic data for demos.
 
 ## Validation and scope
 
-Four tests check raw-email absence from bundle files, overwrite rejection,
-budget rejection without partial output, and required review for missed names.
+Four bundle tests plus ten decision tests check raw-email absence, overwrite
+rejection, budget failure, pending/rejected export blocking, tamper detection,
+reviewer requirements, and approved sanitized export.
 No OCR accuracy, PHI recall, HIPAA compliance, model performance or production
 throughput is claimed. A future OCR adapter must preserve page coordinates and
 validate final rendered pixel masking separately from text redaction.
