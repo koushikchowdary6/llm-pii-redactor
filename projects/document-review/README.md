@@ -1,3 +1,7 @@
+> **Standalone repository:** [document-review-pipeline](https://github.com/koushikchowdary6/document-review-pipeline). The independent migration passed clean-checkout tests and [GitHub Actions](https://github.com/koushikchowdary6/document-review-pipeline/actions/runs/41059767849).
+>
+> This original implementation is retained for history and compatibility. Removal requires separate owner approval. New development belongs in the standalone repository.
+
 # Document Review — redaction bundles for ingestion workflows
 
 A local document-ingestion stage that applies the repository's real redactor
