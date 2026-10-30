@@ -1,0 +1,5 @@
+Synthetic support record — not a real patient or customer.
+Contact: demo@example.com
+SSN: 123-45-6789
+Task: review a sample intake record before indexing it for retrieval.
+Reviewer must inspect names and contextual identifiers manually.
