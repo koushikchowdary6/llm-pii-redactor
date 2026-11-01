@@ -66,6 +66,26 @@ def test_entropy_monotonic():
     assert shannon_entropy("aaaa") < shannon_entropy("ab12XY")
 
 
+def test_entropy_matches_hand_calculated_symbol_frequencies():
+    # One symbol has zero uncertainty; four equiprobable symbols have 2 bits.
+    assert shannon_entropy('') == 0.0
+    assert shannon_entropy('a' * 1000) == 0.0
+    assert shannon_entropy('aabbccdd') == 2.0
+    assert shannon_entropy('aabb') == 1.0
+
+
+def test_long_mixed_secret_is_still_redacted_without_raw_value_in_findings():
+    # Long untrusted tokens should be handled by a single symbol-count pass.
+    # This exercises the real detector, not only the entropy helper.
+    alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_'
+    secret = alphabet * 3000
+    sanitized, findings = redact('value ' + secret + ' end')
+    assert secret not in sanitized
+    assert '[REDACTED:HIGH_ENTROPY_SECRET]' in sanitized
+    assert any(f.kind == 'HIGH_ENTROPY_SECRET' for f in findings)
+    assert all(secret not in f.value for f in findings)
+
+
 def test_redaction_preserves_surrounding_text():
     red, _ = redact("start jane@x.com end")
     assert red.startswith("start ") and red.endswith(" end")
