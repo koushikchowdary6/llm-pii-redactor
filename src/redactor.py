@@ -26,6 +26,7 @@ import re
 import stat
 import sys
 from dataclasses import dataclass
+from collections import Counter
 
 # A bounded pre-LLM guardrail must not exhaust resources on untrusted prompts.
 # Oversized input is rejected, never partially redacted and forwarded.
@@ -161,11 +162,12 @@ def _luhn_ok(number: str) -> bool:
 
 
 def shannon_entropy(s: str) -> float:
+    """Count symbols once; avoid repeated full-token scans on long prompts."""
     if not s:
         return 0.0
-    counts = {c: s.count(c) for c in set(s)}
+    counts = Counter(s)
     n = len(s)
-    return -sum((c / n) * math.log2(c / n) for c in counts.values())
+    return -sum((count / n) * math.log2(count / n) for count in counts.values())
 
 
 def _find_high_entropy(text: str, min_len: int = 20, min_entropy: float = 3.5) -> list[Finding]:
