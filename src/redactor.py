@@ -260,19 +260,28 @@ def detect(text: str) -> list[Finding]:
     # Otherwise an IPv6 literal or provider key inside a Cookie header can
     # preempt the full-value match and leave the rest of the cookie exposed.
     findings: list[Finding] = []
-    claimed: list[tuple[int, int]] = []
+    # A list of claimed spans makes each overlap query O(number of findings).
+    # Thousands of short PII matches previously caused quadratic work even
+    # though MAX_INPUT_CHARS bounded the input size. Track occupied character
+    # offsets instead: memory is bounded by the input length, and overlap
+    # checks inspect only the candidate span, not every earlier finding.
+    occupied = bytearray(len(text))
+
+    def claim(start: int, end: int) -> None:
+        occupied[start:end] = b"\x01" * (end - start)
+
     # Header names are public metadata, not high-entropy secret values.
     # Preserve the header name even when its hyphenated spelling looks random.
     sensitive_header_name_spans: list[tuple[int, int]] = []
 
     def overlaps(s: int, e: int) -> bool:
-        return any(s < ce and cs < e for cs, ce in claimed)
+        return occupied.find(1, s, e) != -1
 
     for match in _PATTERN_MAP["SENSITIVE_HEADER"].finditer(text):
         start, end = match.span("value")
         sensitive_header_name_spans.append((match.start(), start))
         findings.append(Finding("SENSITIVE_HEADER", match.group("value"), start, end))
-        claimed.append((start, end))
+        claim(start, end)
 
     # An Authorization header can carry Digest, AWS SigV4, or a custom
     # credential scheme. Redact the complete opaque header so commas,
@@ -292,14 +301,14 @@ def detect(text: str) -> list[Finding]:
         findings.append(Finding(
             "AUTHORIZATION_CREDENTIAL", match.group(), match.start(), match.end()
         ))
-        claimed.append(match.span())
+        claim(*match.span())
 
     # YAML literal/folded scalars may contain multiple secret lines. Claim
     # the entire indented block before ordinary one-line config matching.
     for finding in _find_yaml_block_secrets(text):
         if not overlaps(finding.start, finding.end):
             findings.append(finding)
-            claimed.append((finding.start, finding.end))
+            claim(finding.start, finding.end)
 
     # Claim JSON credential strings before IP/provider/entropy detectors.
     # Otherwise a nested email or token can consume only part of a value,
@@ -309,13 +318,13 @@ def detect(text: str) -> list[Finding]:
             start, end = match.span("value")
             if not overlaps(start, end):
                 findings.append(Finding(kind, match.group("value"), start, end))
-                claimed.append((start, end))
+                claim(start, end)
 
     # Validate and claim complete IPv6 literals before the IPv4 pattern.
     for finding in _find_ipv6(text):
         if not overlaps(finding.start, finding.end):
             findings.append(finding)
-            claimed.append((finding.start, finding.end))
+            claim(finding.start, finding.end)
 
     for kind in _ORDER:
         for m in _PATTERN_MAP[kind].finditer(text):
@@ -332,7 +341,7 @@ def detect(text: str) -> list[Finding]:
             if kind == "CREDIT_CARD" and not _luhn_ok(val):
                 continue
             findings.append(Finding(kind, val, s, e))
-            claimed.append((s, e))
+            claim(s, e)
 
     # Field names in JSON/YAML are structural metadata, not secret values.
     # The entropy fallback can otherwise mask a long credential-like *key*
@@ -356,7 +365,7 @@ def detect(text: str) -> list[Finding]:
                 and not any(start <= f.start and f.end <= end
                             for start, end in (sensitive_header_name_spans + structured_key_spans))):
             findings.append(f)
-            claimed.append((f.start, f.end))
+            claim(f.start, f.end)
 
     return sorted(findings, key=lambda f: f.start)
 
