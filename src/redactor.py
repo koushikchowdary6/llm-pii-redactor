@@ -81,7 +81,7 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
         re.IGNORECASE | re.MULTILINE,
     )),
     ("JSON_SECRET", re.compile(
-        r'"(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|'
+        r'"(?:api[_-]?key|apiKey|access[_-]?token|accessToken|refresh[_-]?token|refreshToken|id[_-]?token|idToken|clientSecret|awsSecretAccessKey|awsAccessKeyId|awsSessionToken|sessionToken|webhookSecret|proxyAuthorization|xAmzSecurityToken|'
         r'client[_-]?secret|aws[_-]?(?:secret[_-]?access[_-]?key|session[_-]?token|access[_-]?key[_-]?id)|password|passwd|secret|token|authorization|'
         r'session[_-]?token|webhook[_-]?secret|cookie|set[_-]?cookie|proxy[_-]?authorization|x[_-]?amz[_-]?security[_-]?token)"[ \t\r\n]*:[ \t\r\n]*'
         r'"(?P<value>(?:\\.|[^"\\])+)"',
@@ -92,7 +92,7 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     # quoting the replacement in redact(); never expose the numeric value.
     # The trailing delimiter prevents matching a prefix of malformed JSON.
     ("JSON_NUMERIC_SECRET", re.compile(
-        r'"(?:api[_-]?key|access[_-]?token|refresh[_-]?token|id[_-]?token|'
+        r'"(?:api[_-]?key|apiKey|access[_-]?token|accessToken|refresh[_-]?token|refreshToken|id[_-]?token|idToken|clientSecret|awsSecretAccessKey|awsAccessKeyId|awsSessionToken|sessionToken|webhookSecret|proxyAuthorization|xAmzSecurityToken|'
         r'client[_-]?secret|aws[_-]?(?:secret[_-]?access[_-]?key|session[_-]?token|access[_-]?key[_-]?id)|'
         r'password|passwd|secret|token|authorization|session[_-]?token|webhook[_-]?secret|cookie|set[_-]?cookie|proxy[_-]?authorization|x[_-]?amz[_-]?security[_-]?token)"'
         r'[ \t\r\n]*:[ \t\r\n]*(?P<value>-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)'
